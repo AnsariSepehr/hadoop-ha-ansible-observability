@@ -1,0 +1,68 @@
+# Prometheus configuration for the Hadoop HA platform.
+# Targets for every Ansible-managed service come from file_sd JSON files that are
+# generated from the Ansible inventory (see gen-targets.py), so this file has no hosts in it.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'hadoop-noc'
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Host metrics of the monitoring node itself (service name on the Swarm overlay network)
+  - job_name: 'node_exporter_monitoring_node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels: { hostname: 'noc', role: 'monitoring-node' }
+
+  # ---- Cluster services, generated from the Ansible inventory ---------------------------
+  - job_name: 'hadoop_namenode_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hadoop_namenode_jmx.json'] }]
+  - job_name: 'hadoop_zkfc_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hadoop_zkfc_jmx.json'] }]
+  - job_name: 'hadoop_datanode_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hadoop_datanode_jmx.json'] }]
+  - job_name: 'hadoop_journalnode_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hadoop_journalnode_jmx.json'] }]
+  - job_name: 'zookeeper_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/zookeeper_jmx.json'] }]
+  - job_name: 'yarn_resourcemanager_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/yarn_resourcemanager_jmx.json'] }]
+  - job_name: 'yarn_nodemanager_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/yarn_nodemanager_jmx.json'] }]
+  - job_name: 'mapred_historyserver_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/mapred_historyserver_jmx.json'] }]
+  - job_name: 'hive_hiveserver2_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hive_hiveserver2_jmx.json'] }]
+  - job_name: 'hive_metastore_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/hive_metastore_jmx.json'] }]
+  - job_name: 'spark_history_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/spark_history_jmx.json'] }]
+  - job_name: 'kafka_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/kafka_jmx.json'] }]
+  - job_name: 'zeppelin_jmx'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/zeppelin_jmx.json'] }]
+
+  # Zeppelin's own /metrics endpoint. Prometheus 3 rejects scrapes without a valid
+  # Content-Type unless a fallback protocol is named.
+  - job_name: 'zeppelin_web_metrics'
+    fallback_scrape_protocol: PrometheusText0.0.4
+    static_configs:
+      - targets: ['<NODE3_IP>:8890']
+        labels: { hostname: 'node3', role: 'zeppelin' }
+
+  # ---- Host metrics and the Hive metastore database ------------------------------------------
+  - job_name: 'node_exporter_cluster'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/node_exporter_cluster.json'] }]
+  - job_name: 'mysqld_exporter_metastore'
+    file_sd_configs: [{ files: ['/etc/prometheus/file_sd/mysqld_exporter_metastore.json'] }]
+
+# Optional jobs for services that are not installed by the Ansible project
+# (Kafka exporter, cAdvisor, Airflow, Ranger, Trino, Kubernetes ...):
+# copy what you need from extra-jobs.example.yml into this file.

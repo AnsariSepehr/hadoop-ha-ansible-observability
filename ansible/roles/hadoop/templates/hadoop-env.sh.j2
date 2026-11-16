@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+export JAVA_HOME={{ hadoop_java_home }}
+export HADOOP_HOME={{ hadoop_home }}
+export HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+export HADOOP_LOG_DIR={{ hadoop_log_dir }}
+export HADOOP_PID_DIR={{ hadoop_pid_dir }}
+export HADOOP_HEAPSIZE_MAX={{ hadoop_heap_mb }}m
+export HADOOP_OPTS="$HADOOP_OPTS -Djava.net.preferIPv4Stack=true"

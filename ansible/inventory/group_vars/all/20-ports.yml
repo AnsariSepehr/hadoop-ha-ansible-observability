@@ -1,0 +1,57 @@
+---
+# پورت‌ها (در صورت تداخل با سرویس‌های دیگر اینجا تغییر دهید)
+zookeeper_client_port: 2181
+zookeeper_peer_port: 2888
+zookeeper_election_port: 3888
+zookeeper_admin_port: 8080
+
+hdfs_nameservice: "{{ cluster_name }}-ha"
+hdfs_nn_rpc_port: 8020
+hdfs_nn_http_port: 9870
+hdfs_nn_https_port: 9871
+hdfs_jn_rpc_port: 8485
+hdfs_jn_http_port: 8480
+hdfs_zkfc_rpc_port: 8019
+hdfs_dn_http_port: 9864
+hdfs_dn_https_port: 9865
+hdfs_dn_data_port: 9866
+
+yarn_rm_port: 8032
+yarn_rm_scheduler_port: 8030
+yarn_rm_tracker_port: 8031
+yarn_rm_admin_port: 8033
+yarn_rm_webapp_port: 8088
+yarn_nm_rpc_port: 45454
+yarn_nm_webapp_port: 8042
+mapred_history_port: 10020
+mapred_history_webapp_port: 19888
+
+mysql_port: 3306
+mysql_gr_port: 33061
+
+hive_metastore_port: 9083
+hive_server2_port: 10000
+
+spark_history_port: 18080
+
+kafka_broker_port: 9092
+kafka_controller_port: 9093
+
+# ---- JMX Exporter (هر daemon پورت اختصاصی دارد) --------------------------------------
+# Slot = position in the sorted inventory (node1=0, node2=100, node3=200, etc.)
+jmx_host_offset: "{{ (groups['cluster'] | sort).index(inventory_hostname) | default(0) * 100 }}"
+
+# ---- JMX Exporter (Unique port per SERVICE, same port on every host) ---
+jmx_ports:
+  namenode: 7071
+  datanode: 7072
+  zookeeper: 7075
+  resourcemanager: 7076
+  nodemanager: 7077
+  zkfc: 7078
+  journalnode: 7079
+  historyserver: 7080
+  hiveserver2: 7081
+  hivemetastore: 7082
+  spark_history: 7083
+  kafka: 7084

@@ -1,0 +1,4 @@
+---
+common_limits_nofile: 65536
+common_limits_nproc: 65536
+common_marker_file: /etc/kadoop-initialized

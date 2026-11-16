@@ -1,0 +1,11 @@
+---
+- name: Look for an active time-sync daemon
+  ansible.builtin.command: systemctl is-active chronyd ntpd systemd-timesyncd
+  register: ntp_state
+  changed_when: false
+  failed_when: false
+
+- name: Warn when no time sync is active
+  ansible.builtin.debug:
+    msg: "WARNING: no active chronyd/ntpd on {{ inventory_hostname }} - clock drift breaks ZooKeeper/HDFS HA."
+  when: "'active' not in ntp_state.stdout_lines"

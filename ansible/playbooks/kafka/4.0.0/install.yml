@@ -1,0 +1,25 @@
+---
+- ansible.builtin.import_playbook: ../../_lib/generate-ids.yml
+
+- name: Kafka 4.0.0 - install brokers (KRaft)
+  hosts: kafka_brokers
+  vars:
+    expected_version: "4.0.0"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: kafka_version == expected_version
+        fail_msg: "kafka_version={{ kafka_version }} but this playbook directory is for {{ expected_version }}. Copy it to the matching version directory."
+      run_once: true
+  roles:
+    - kafka
+
+- name: Start brokers
+  hosts: kafka_brokers
+  tasks:
+    - ansible.builtin.include_role: { name: kafka, tasks_from: start }
+
+- name: Verify the cluster
+  hosts: kafka_brokers[0]
+  tasks:
+    - ansible.builtin.include_role: { name: kafka, tasks_from: verify }

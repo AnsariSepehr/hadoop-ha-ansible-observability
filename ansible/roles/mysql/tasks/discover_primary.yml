@@ -1,0 +1,56 @@
+---
+# Sets mysql_primary_addr (address) and mysql_primary_host (inventory name) on the first MySQL node.
+# Tolerant of a missing mysql CLI or an unreachable group: falls back to groups['mysql'][0]
+# rather than failing hard, so callers that only need a best-effort address still work.
+
+- name: Is the mysql CLI available?
+  ansible.builtin.command: which mysql
+  register: mysql_cli_check
+  changed_when: false
+  failed_when: false
+
+- name: Ask the group for its PRIMARY
+  ansible.builtin.command: >-
+    mysql -Nse "SELECT MEMBER_HOST FROM performance_schema.replication_group_members
+                WHERE MEMBER_ROLE='PRIMARY' AND MEMBER_STATE='ONLINE' LIMIT 1"
+  register: gr_primary
+  changed_when: false
+  failed_when: false
+  when:
+    - mysql_gr_enabled | bool
+    - mysql_cli_check.rc == 0
+
+- name: Resolve the primary address
+  ansible.builtin.set_fact:
+    mysql_primary_addr: >-
+      {{ (gr_primary.stdout | default('') | trim)
+         if (mysql_gr_enabled | bool
+             and mysql_cli_check.rc == 0
+             and (gr_primary.stdout | default('') | trim | length > 0))
+         else (hostvars[groups['mysql'][0]].node_addr if groups.get('mysql', []) else '') }}
+
+- name: Default (host not resolved yet)
+  ansible.builtin.set_fact:
+    mysql_primary_host: ''
+
+- name: Map the address back to an inventory host (exact)
+  ansible.builtin.set_fact:
+    mysql_primary_host: "{{ item }}"
+  loop: "{{ groups['mysql'] | default([]) }}"
+  when: hostvars[item].node_addr == mysql_primary_addr
+
+- name: Fall back to the first mysql host if nothing matched
+  ansible.builtin.set_fact:
+    mysql_primary_host: "{{ groups['mysql'][0] }}"
+  when:
+    - mysql_primary_host == ''
+    - groups.get('mysql', []) | length > 0
+
+- name: Warn if we couldn't detect a running primary
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: could not query the MySQL group on {{ inventory_hostname }};
+      using {{ mysql_primary_host | default('(none)') }} as a best-effort target.
+  when:
+    - groups.get('mysql', []) | length > 0
+    - (mysql_cli_check.rc != 0) or ((gr_primary.stdout | default('') | trim | length) == 0)

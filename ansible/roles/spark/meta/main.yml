@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: java
+    java_version: "{{ spark_java_version }}"

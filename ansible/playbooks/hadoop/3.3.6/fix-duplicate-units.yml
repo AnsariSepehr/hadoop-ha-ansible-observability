@@ -1,0 +1,72 @@
+---
+# Safely retire legacy journalnode.service / namenode.service / nodemanager.service duplicates.
+# This playbook does not stop or restart canonical hadoop-* daemons and does
+# not touch HDFS metadata or PID files.
+- name: Retire duplicate legacy Hadoop systemd units
+  hosts: journalnodes:namenodes:nodemanagers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Retire old unprefixed JournalNode unit
+      ansible.builtin.include_role:
+        name: hadoop
+        tasks_from: retire_legacy_unit
+      vars:
+        legacy_unit_name: journalnode
+      when: "'journalnodes' in group_names"
+
+    - name: Retire old unprefixed NameNode unit
+      ansible.builtin.include_role:
+        name: hadoop
+        tasks_from: retire_legacy_unit
+      vars:
+        legacy_unit_name: namenode
+      when: "'namenodes' in group_names"
+
+    - name: Retire old daemonizing NodeManager unit
+      ansible.builtin.include_role:
+        name: hadoop
+        tasks_from: retire_legacy_nodemanager
+      when: "'nodemanagers' in group_names"
+
+    - name: Verify canonical JournalNode unit exists where required
+      ansible.builtin.stat:
+        path: /etc/systemd/system/hadoop-journalnode.service
+      register: canonical_journalnode_unit
+      when: "'journalnodes' in group_names"
+
+    - name: Assert canonical JournalNode unit exists where required
+      ansible.builtin.assert:
+        that: canonical_journalnode_unit.stat.exists
+        fail_msg: >-
+          hadoop-journalnode.service is missing. The legacy duplicate was
+          retired safely, but install the Hadoop role before starting JournalNode.
+      when: "'journalnodes' in group_names"
+
+    - name: Verify canonical NodeManager unit exists where required
+      ansible.builtin.stat:
+        path: /etc/systemd/system/hadoop-nodemanager.service
+      register: canonical_nodemanager_unit
+      when: "'nodemanagers' in group_names"
+
+    - name: Assert canonical NodeManager unit exists where required
+      ansible.builtin.assert:
+        that: canonical_nodemanager_unit.stat.exists
+        fail_msg: >-
+          hadoop-nodemanager.service is missing. Install the Hadoop role before
+          starting NodeManager.
+      when: "'nodemanagers' in group_names"
+
+    - name: Verify canonical NameNode unit exists where required
+      ansible.builtin.stat:
+        path: /etc/systemd/system/hadoop-namenode.service
+      register: canonical_namenode_unit
+      when: "'namenodes' in group_names"
+
+    - name: Assert canonical NameNode unit exists where required
+      ansible.builtin.assert:
+        that: canonical_namenode_unit.stat.exists
+        fail_msg: >-
+          hadoop-namenode.service is missing. The legacy duplicate was
+          retired safely, but install the Hadoop role before starting NameNode.
+      when: "'namenodes' in group_names"

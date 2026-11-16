@@ -1,0 +1,12 @@
+---
+# Remove Apache Zeppelin (notebooks kept unless -e zeppelin_clean_data=true)
+# Run: ansible-playbook playbooks/zeppelin/0.12.1/clean.yml
+- name: Remove Apache Zeppelin (notebooks kept unless -e zeppelin_clean_data=true)
+  hosts: zeppelin
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run zeppelin role (clean)
+      ansible.builtin.include_role:
+        name: zeppelin
+        tasks_from: clean

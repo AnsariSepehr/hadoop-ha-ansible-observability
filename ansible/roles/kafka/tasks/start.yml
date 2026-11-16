@@ -1,0 +1,31 @@
+---
+- name: Start Kafka
+  ansible.builtin.systemd:
+    name: kafka
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for the broker and controller ports
+  ansible.builtin.wait_for:
+    host: "{{ node_addr }}"
+    port: "{{ item }}"
+    timeout: 180
+  loop: ["{{ kafka_broker_port }}", "{{ kafka_controller_port }}"]
+
+- name: Wait for Kafka JMX exporter port
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ kafka_jmx_port }}"
+    timeout: 120
+  when: kafka_jmx_enabled | bool
+
+- name: Check Kafka JMX exporter metrics
+  ansible.builtin.command:
+    cmd: "curl -fsS http://127.0.0.1:{{ kafka_jmx_port }}/metrics"
+  register: kafka_jmx_metrics
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: kafka_jmx_metrics.stdout is search('(?m)^kafka_')
+  when: kafka_jmx_enabled | bool

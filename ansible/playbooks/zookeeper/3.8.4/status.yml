@@ -1,0 +1,19 @@
+---
+- name: ZooKeeper status
+  hosts: zookeepers
+  tasks:
+    - name: Query the quorum role via the 4-letter 'stat' command
+      ansible.builtin.shell: |
+        set -o pipefail
+        exec 3<>/dev/tcp/127.0.0.1/{{ zookeeper_client_port }}
+        printf "stat" >&3
+        cat <&3 | sed -n 's/^Mode:[[:space:]]*//p'
+        exec 3<&-
+        exec 3>&-
+      register: zk_status
+      changed_when: false
+      failed_when: false
+
+    - name: Show role
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Mode: {{ (zk_status.stdout | trim) or 'NOT RUNNING' }}"

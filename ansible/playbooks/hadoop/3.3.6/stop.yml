@@ -1,0 +1,14 @@
+---
+# Ordered stop of the whole Hadoop layer (top of the stack first).
+- name: Stop YARN + MapReduce daemons
+  hosts: history_servers:nodemanagers:resourcemanagers
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: stop }
+- name: Stop HDFS daemons
+  hosts: datanodes:namenodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: stop }
+- name: Stop JournalNodes
+  hosts: journalnodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: stop }

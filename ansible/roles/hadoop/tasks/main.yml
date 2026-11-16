@@ -1,0 +1,105 @@
+---
+# Installs Hadoop binaries, configuration and systemd units. Does not start anything.
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+# Remove duplicate legacy units before installing canonical hadoop-* units.
+# This workflow fails closed if a legacy unit still owns a process.
+- name: Retire duplicate legacy JournalNode unit
+  ansible.builtin.include_tasks: retire_legacy_unit.yml
+  vars:
+    legacy_unit_name: journalnode
+  when: "'journalnodes' in group_names"
+
+- name: Retire duplicate legacy NameNode unit
+  ansible.builtin.include_tasks: retire_legacy_unit.yml
+  vars:
+    legacy_unit_name: namenode
+  when: "'namenodes' in group_names"
+
+- name: Retire legacy daemonizing NodeManager unit
+  ansible.builtin.include_tasks: retire_legacy_nodemanager.yml
+  when: "'nodemanagers' in group_names"
+
+- name: Install Hadoop binaries
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: install_tarball
+  vars:
+    pkg_label: hadoop
+    pkg_src: "{{ hadoop_package }}"
+    pkg_dir: "{{ install_root }}/hadoop-{{ hadoop_version }}"
+    pkg_link: "{{ hadoop_home }}"
+    pkg_owner: "{{ hadoop_user }}"
+    pkg_group: "{{ hadoop_group }}"
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ hadoop_log_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+
+- name: Keep the PID directory across reboots
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/hadoop.conf
+    mode: "0644"
+    content: "d {{ hadoop_pid_dir }} 0755 {{ hadoop_user }} {{ hadoop_group }} -\n"
+  register: hadoop_tmpfiles
+
+- name: Create the PID directory now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/hadoop.conf
+  when: hadoop_tmpfiles is changed
+  changed_when: true
+
+- name: Create role-specific data directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ hdfs_nn_dir }}", mode: "0700", when: namenodes }
+    - { path: "{{ hdfs_dn_dir }}", mode: "0700", when: datanodes }
+    - { path: "{{ hdfs_jn_dir }}", mode: "0700", when: journalnodes }
+    - { path: "{{ yarn_local_dir }}", when: nodemanagers }
+    - { path: "{{ yarn_log_dir }}", when: nodemanagers }
+    - { path: "{{ data_root }}/hadoop/tmp", when: cluster }
+  when: item.when in group_names
+
+- name: Environment for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/hadoop.sh
+    mode: "0644"
+    content: |
+      export JAVA_HOME={{ hadoop_java_home }}
+      export HADOOP_HOME={{ hadoop_home }}
+      export HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+      export HADOOP_MAPRED_HOME={{ hadoop_home }}
+      export YARN_CONF_DIR={{ hadoop_conf_dir }}
+      export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+# Generate/distribute keystores before any Hadoop daemon is bootstrapped.
+# This ensures the first NameNode/JournalNode start can bind HTTPS immediately.
+- name: Prepare Hadoop TLS material when TLS is enabled
+  ansible.builtin.include_tasks: ssl.yml
+  when: hadoop_ssl_enabled | bool
+
+- name: Deploy configuration files
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Install systemd units for the daemons of this node
+  ansible.builtin.template:
+    src: hadoop.service.j2
+    dest: "/etc/systemd/system/hadoop-{{ item.name }}.service"
+    mode: "0644"
+  loop: "{{ hadoop_units }}"
+  when: item.group in group_names
+  notify: Reload systemd
+
+- name: Flush handlers (units must be known before they are started)
+  ansible.builtin.meta: flush_handlers

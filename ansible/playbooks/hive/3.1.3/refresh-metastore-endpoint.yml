@@ -1,0 +1,12 @@
+---
+# After a MySQL primary change: re-discover it, rewrite hive-site.xml and restart Hive.
+- name: Find the MySQL primary
+  hosts: mysql
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: discover_primary }
+      when: inventory_hostname == groups['mysql'][0]
+
+- name: Update Hive
+  hosts: hive_servers
+  tasks:
+    - ansible.builtin.include_role: { name: hive, tasks_from: refresh }

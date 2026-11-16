@@ -1,0 +1,104 @@
+---
+- name: YARN ResourceManagers
+  hosts: resourcemanagers
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: yarn_start }
+      vars: { yarn_unit: resourcemanager }
+
+- name: YARN NodeManagers
+  hosts: nodemanagers
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: yarn_start }
+      vars: { yarn_unit: nodemanager }
+
+- name: MapReduce JobHistory Server
+  hosts: history_servers
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: yarn_start }
+      vars: { yarn_unit: historyserver }
+
+- name: Verify that every NodeManager registered
+  hosts: resourcemanagers[0]
+  tasks:
+    # Wait until one ResourceManager reports "active" (HA election via ZooKeeper
+    # can take a little while after the daemons start).
+    - name: Wait for an active ResourceManager
+      ansible.builtin.shell: |
+        for id in {{ yarn_rm_ids | join(' ') }}; do
+          st=$(timeout 20 {{ hadoop_home }}/bin/yarn rmadmin -getServiceState "$id" 2>/dev/null | tr -d '\n')
+          echo "$id=$st"
+          [ "$st" = "active" ] && exit 0
+        done
+        exit 1
+      args:
+        executable: /bin/bash
+      environment: "{{ hadoop_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: rm_active
+      until: rm_active.rc == 0
+      retries: 24
+      delay: 5
+      changed_when: false
+      when: yarn_rm_ha | bool
+
+    # `timeout` keeps a hanging yarn client from freezing the play with no output;
+    # stderr is kept so a failure is visible.
+ 
+    - name: Count RUNNING nodes
+      ansible.builtin.shell: |
+        set -o pipefail
+
+        output=$(timeout 30 {{ hadoop_home }}/bin/yarn node -list -states RUNNING 2>&1)
+        rc=$?
+
+        if [ "$rc" -ne 0 ]; then
+          printf '%s\n' "$output" >&2
+          exit "$rc"
+        fi
+
+        printf '%s\n' "$output" | awk '
+          $1 ~ /:[0-9]+$/ && $2 == "RUNNING" { count++ }
+          END { print count+0 }
+        '
+      args:
+        executable: /bin/bash
+      environment: "{{ hadoop_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: yarn_nodes
+      until:
+        - yarn_nodes.rc == 0
+        - (yarn_nodes.stdout | trim | int) == (groups['nodemanagers'] | length)
+      retries: 24
+      delay: 5
+      changed_when: false
+      failed_when: false
+
+    - name: Show NodeManager status when not all registered
+      ansible.builtin.shell: |
+        timeout 30 {{ hadoop_home }}/bin/yarn node -list -all 2>&1
+      args:
+        executable: /bin/bash
+      environment: "{{ hadoop_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: yarn_nodes_detail
+      changed_when: false
+      failed_when: false
+      when:
+        - yarn_nodes.rc != 0 or
+          (yarn_nodes.stdout | trim | int) != (groups['nodemanagers'] | length)
+
+    - name: Show NodeManager count
+      ansible.builtin.debug:
+        msg: "NodeManagers RUNNING: {{ yarn_nodes.stdout | trim }} / {{ groups['nodemanagers'] | length }}"
+
+    - name: Fail if not every NodeManager registered
+      ansible.builtin.fail:
+        msg: |
+          Only {{ yarn_nodes.stdout | default('0') | trim }} of {{ groups['nodemanagers'] | length }} NodeManagers are RUNNING.
+          {{ yarn_nodes_detail.stdout | default(yarn_nodes.stderr | default('')) }}
+      when:
+        - yarn_nodes.rc != 0 or
+          (yarn_nodes.stdout | trim | int) != (groups['nodemanagers'] | length)

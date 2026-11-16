@@ -1,0 +1,17 @@
+---
+# Ordered start: ZooKeeper -> HDFS/YARN -> MySQL -> Hive -> Spark History -> Kafka
+- ansible.builtin.import_playbook: zookeeper/3.8.4/start.yml
+- ansible.builtin.import_playbook: hadoop/3.3.6/start.yml
+- name: MySQL
+  hosts: mysql
+  tasks:
+    - ansible.builtin.systemd: { name: mysqld, state: started }
+- ansible.builtin.import_playbook: hive/3.1.3/start.yml
+- name: Spark History Server
+  hosts: spark_history_servers
+  tasks:
+    - ansible.builtin.systemd: { name: spark-history-server, state: started }
+- name: Kafka
+  hosts: kafka_brokers
+  tasks:
+    - ansible.builtin.systemd: { name: kafka, state: started }

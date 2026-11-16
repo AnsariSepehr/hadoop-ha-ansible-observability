@@ -1,0 +1,38 @@
+---
+- name: 1/8 JournalNodes
+  hosts: journalnodes
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_journalnode }
+
+- name: 2/8 First NameNode - format, initialise ZooKeeper znode, start
+  hosts: namenodes[0]
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_namenode_primary }
+
+- name: 3/8 Standby NameNode - bootstrapStandby, start
+  hosts: namenodes[1:]
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_namenode_standby }
+
+- name: 4/8 ZKFC on both NameNodes
+  hosts: namenodes
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_zkfc }
+
+- name: 5/8 Wait for an active NameNode
+  hosts: namenodes[0]
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_wait_active }
+
+- name: 6/8 DataNodes
+  hosts: datanodes
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_datanode }
+
+- name: 7/8 Base HDFS directories
+  hosts: namenodes[0]
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: hdfs_dirs }

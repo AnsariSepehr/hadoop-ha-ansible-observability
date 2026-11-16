@@ -1,0 +1,81 @@
+---
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Hadoop must be installed first
+  ansible.builtin.stat:
+    path: "{{ hadoop_home }}/bin/hdfs"
+  register: spark_hadoop
+  failed_when: not spark_hadoop.stat.exists
+
+- name: Install Spark binaries
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: install_tarball
+  vars:
+    pkg_label: spark
+    pkg_src: "{{ spark_package }}"
+    pkg_dir: "{{ install_root }}/spark-{{ spark_version }}"
+    pkg_link: "{{ spark_home }}"
+    pkg_owner: "{{ spark_user }}"
+    pkg_group: "{{ spark_group }}"
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ spark_home }}/logs"
+    state: directory
+    owner: "{{ spark_user }}"
+    group: "{{ spark_group }}"
+    mode: "0755"
+
+- name: Keep /run/spark across reboots
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/spark.conf
+    mode: "0644"
+    content: "d {{ run_root }}/spark 0755 {{ spark_user }} {{ spark_group }} -\n"
+  register: spark_tmpfiles
+
+- name: Create /run/spark now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/spark.conf
+  when: spark_tmpfiles is changed
+  changed_when: true
+
+- name: Configuration files
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ spark_home }}/conf/{{ item }}"
+    owner: "{{ spark_user }}"
+    group: "{{ spark_group }}"
+    mode: "0644"
+  loop: [spark-env.sh, spark-defaults.conf]
+  notify: Restart spark-history-server
+
+- name: Share hive-site.xml with Spark
+  ansible.builtin.file:
+    src: "{{ hive_conf_dir }}/hive-site.xml"
+    dest: "{{ spark_home }}/conf/hive-site.xml"
+    state: link
+    force: true
+  when: spark_integrate_hive | bool and inventory_hostname in groups.get('hive_servers', [])
+
+- name: Environment for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/spark.sh
+    mode: "0644"
+    content: |
+      export SPARK_HOME={{ spark_home }}
+      export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+      export PYSPARK_PYTHON=python3
+
+- name: History server unit
+  ansible.builtin.template:
+    src: spark-history-server.service.j2
+    dest: /etc/systemd/system/spark-history-server.service
+    mode: "0644"
+  when: inventory_hostname in groups.get('spark_history_servers', [])
+  notify: Restart spark-history-server
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

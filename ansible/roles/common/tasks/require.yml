@@ -1,0 +1,11 @@
+---
+# include_role: common tasks_from=require  -> stops early if the node was never initialised
+- name: Check that the node was initialised
+  ansible.builtin.stat:
+    path: "{{ common_marker_file }}"
+  register: kadoop_marker
+
+- name: Fail with a clear message if not initialised
+  ansible.builtin.fail:
+    msg: "{{ inventory_hostname }} is not initialised. Run playbooks/system/initialize.yml first."
+  when: not kadoop_marker.stat.exists

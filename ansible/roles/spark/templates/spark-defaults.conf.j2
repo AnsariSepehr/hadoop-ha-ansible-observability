@@ -1,0 +1,44 @@
+# {{ ansible_managed }}
+# Address the executors/AM use to reach the driver of jobs submitted from this node
+spark.driver.host                  {{ node_addr }}
+spark.driver.bindAddress           0.0.0.0
+
+spark.master                       yarn
+spark.submit.deployMode            client
+
+# Sizes derive from the YARN container limits (inventory/group_vars/all/40-resources.yml)
+spark.driver.memory                {{ spark_driver_memory_mb }}m
+spark.driver.cores                 1
+spark.executor.memory              {{ spark_executor_memory_mb }}m
+spark.executor.memoryOverhead      {{ spark_executor_overhead_mb }}m
+spark.executor.cores               {{ spark_executor_cores }}
+spark.executor.instances           {{ spark_executor_instances }}
+
+spark.yarn.maxAppAttempts          1
+spark.yarn.appMasterEnv.HADOOP_USER_NAME  {{ spark_user }}
+spark.executorEnv.HADOOP_USER_NAME        {{ spark_user }}
+
+spark.eventLog.enabled             true
+spark.eventLog.dir                 {{ spark_event_log_dir }}
+spark.history.fs.logDirectory      {{ spark_event_log_dir }}
+spark.history.ui.port              {{ spark_history_port }}
+
+spark.yarn.archive                 hdfs://{{ hdfs_nameservice }}{{ spark_yarn_archive_hdfs_dir }}/spark-libs.jar
+
+spark.serializer                   org.apache.spark.serializer.KryoSerializer
+spark.pyspark.python               python3
+spark.pyspark.driver.python        python3
+{% if spark_integrate_hive | bool %}
+
+# Hive integration
+spark.sql.catalogImplementation    hive
+spark.hadoop.hive.metastore.uris   {{ hive_metastore_uris }}
+spark.sql.warehouse.dir            hdfs://{{ hdfs_nameservice }}/user/hive/warehouse
+{% endif %}
+
+# ---- Prometheus Metrics ----
+spark.ui.prometheus.enabled true
+spark.metrics.conf.*.sink.prometheusServlet.class org.apache.spark.metrics.sink.PrometheusServlet
+spark.metrics.conf.*.sink.prometheusServlet.path /metrics/prometheus
+spark.metrics.conf.master.sink.prometheusServlet.path /metrics/master/prometheus
+spark.metrics.conf.applications.sink.prometheusServlet.path /metrics/applications/prometheus

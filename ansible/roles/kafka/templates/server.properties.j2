@@ -1,0 +1,18 @@
+# {{ ansible_managed }}  (KRaft: every node is broker + controller)
+process.roles=broker,controller
+node.id={{ kafka_node_id }}
+controller.quorum.voters={% for h in groups['kafka_brokers'] %}{{ loop.index }}@{{ hostvars[h].node_addr }}:{{ kafka_controller_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+listeners=PLAINTEXT://{{ node_addr }}:{{ kafka_broker_port }},CONTROLLER://{{ node_addr }}:{{ kafka_controller_port }}
+advertised.listeners=PLAINTEXT://{{ node_addr }}:{{ kafka_broker_port }}
+inter.broker.listener.name=PLAINTEXT
+controller.listener.names=CONTROLLER
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+log.dirs={{ kafka_data_dir }}
+num.partitions={{ kafka_replication_factor }}
+default.replication.factor={{ kafka_replication_factor }}
+min.insync.replicas={{ kafka_min_isr }}
+offsets.topic.replication.factor={{ kafka_replication_factor }}
+transaction.state.log.replication.factor={{ kafka_replication_factor }}
+transaction.state.log.min.isr={{ kafka_min_isr }}
+auto.create.topics.enable={{ kafka_auto_create_topics | lower }}

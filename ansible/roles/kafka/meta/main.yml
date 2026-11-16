@@ -1,0 +1,6 @@
+---
+dependencies:
+  - role: java
+    java_version: "{{ kafka_java_version }}"
+  - role: jmx_exporter
+    when: jmx_exporter_enabled | bool

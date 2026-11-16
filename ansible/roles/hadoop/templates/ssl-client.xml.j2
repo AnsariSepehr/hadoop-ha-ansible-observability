@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+  <property><name>ssl.client.truststore.type</name><value>jks</value></property>
+  <property><name>ssl.client.truststore.location</name><value>{{ hadoop_ssl_dir }}/truststore.jks</value></property>
+  <property><name>ssl.client.truststore.password</name><value>{{ ssl_keystore_password }}</value></property>
+  <property><name>ssl.client.truststore.reload.interval</name><value>10000</value></property>
+</configuration>

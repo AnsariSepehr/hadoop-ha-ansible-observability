@@ -1,0 +1,190 @@
+---
+- name: Is this NameNode already formatted?
+  ansible.builtin.stat:
+    path: "{{ hdfs_nn_dir }}/current/VERSION"
+  register: sb_version
+
+- name: Inspect the standby NameNode directory before any bootstrap cleanup
+  ansible.builtin.find:
+    paths: "{{ hdfs_nn_dir }}"
+    file_type: any
+    hidden: true
+    recurse: false
+  register: standby_nn_contents
+  failed_when: false
+
+- name: Refuse to erase unrecognised standby NameNode contents
+  ansible.builtin.assert:
+    that:
+      - hdfs_force_reformat | bool or sb_version.stat.exists or (standby_nn_contents.matched | default(0) | int) == 0
+    fail_msg: >-
+      {{ hdfs_nn_dir }} contains files but has no current/VERSION. Refusing to erase potentially
+      recoverable NameNode metadata. Restore the correct metadata or explicitly confirm a full
+      HDFS reformat with -e hdfs_force_reformat=true -e confirm_destroy_data=yes.
+  when: not sb_version.stat.exists
+
+- name: Stop NameNode and ZKFC on this standby (clean slate before bootstrap)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop: [hadoop-zkfc, hadoop-namenode]
+  failed_when: false
+
+- name: Terminate only an orphaned NameNode JVM on this standby
+  ansible.builtin.shell: |
+    set -eu
+    pids=$(pgrep -u '{{ hadoop_user }}' -f '[o]rg[.]apache[.]hadoop[.]hdfs[.]server[.]namenode[.]NameNode' 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+      kill -TERM $pids 2>/dev/null || true
+      for attempt in $(seq 1 15); do
+        alive=''
+        for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+        [ -z "$alive" ] && break
+        sleep 1
+      done
+      for pid in $pids; do kill -KILL "$pid" 2>/dev/null || true; done
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Wipe local metadata if forced or missing
+  ansible.builtin.shell: |
+    set -eu
+    if [ -d "{{ hdfs_nn_dir }}" ]; then
+      find "{{ hdfs_nn_dir }}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    else
+      install -d -m 0700 -o "{{ hadoop_user }}" -g "{{ hadoop_group }}" "{{ hdfs_nn_dir }}"
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: hdfs_force_reformat | bool or not sb_version.stat.exists
+
+- name: Wait until the first NameNode accepts RPC
+  ansible.builtin.shell: |
+    for i in $(seq 1 60); do
+      {{ hadoop_home }}/bin/hdfs haadmin -getServiceState {{ hdfs_nn_ids[0] }} 2>/dev/null | grep -qE 'active|standby' && exit 0
+      sleep 2
+    done
+    exit 1
+  environment: "{{ hadoop_env | combine({'HDFS_NAMENODE_OPTS': ''}) }}"
+  become: true
+  become_user: "{{ hadoop_user }}"
+  changed_when: false
+
+- name: Copy metadata from the active NameNode
+  ansible.builtin.command: >-
+    {{ hadoop_run }} {{ hadoop_home }}/bin/hdfs namenode -bootstrapStandby -nonInteractive -force
+  environment: "{{ hadoop_env | combine({'HDFS_NAMENODE_OPTS': ''}) }}"
+  when: hdfs_force_reformat | bool or not sb_version.stat.exists
+  register: bootstrap_standby
+  retries: 5
+  delay: 10
+  until: bootstrap_standby.rc == 0
+  changed_when: true
+
+# Keep service startup inside this block: include_tasks failures must also
+# trigger the diagnostics below. Previously service.yml's TCP wait failed
+# before the later standby-health rescue block could run.
+- name: Start and verify the standby NameNode
+  block:
+    - name: Start the standby NameNode
+      ansible.builtin.include_tasks: service.yml
+      vars:
+        svc: namenode
+        svc_port: "{{ hdfs_nn_rpc_port }}"
+  rescue:
+    - name: Collect standby NameNode startup diagnostics
+      ansible.builtin.shell: |
+        echo "===== systemctl status ====="
+        systemctl status hadoop-namenode --no-pager -l 2>&1 | tail -n 30
+        echo "===== journalctl ====="
+        journalctl -u hadoop-namenode --no-pager -n 150 2>&1
+        echo "===== NameNode log errors ====="
+        find "{{ hadoop_log_dir }}" -maxdepth 1 -type f -print 2>/dev/null | while read f; do
+          echo "--- $f"
+          tail -n 250 "$f" 2>/dev/null | grep -E -i 'FATAL|ERROR|Exception|Caused by|BindException|Incompatible|namespace|cluster.?id' | tail -n 60 || true
+        done
+        echo "===== listener/process ====="
+        ss -lntp 2>&1 | grep -E ':(8020|9870|9871)([[:space:]]|$)' || true
+        ps -ef | grep -E '[o]rg.apache.hadoop.hdfs.server.namenode.NameNode' || true
+        echo "===== disk and memory ====="
+        df -h "{{ hdfs_nn_dir }}" "{{ hadoop_log_dir }}" 2>&1
+        free -m
+        echo "===== kernel OOM ====="
+        dmesg -T 2>/dev/null | grep -i -E 'out of memory|killed process' | tail -n 10 || true
+      args:
+        executable: /bin/bash
+      register: nn_start_diagnostics
+      changed_when: false
+      failed_when: false
+
+    - name: Print standby NameNode startup diagnostics
+      ansible.builtin.debug:
+        var: nn_start_diagnostics.stdout_lines
+
+    - name: Fail with the original startup failure context
+      ansible.builtin.fail:
+        msg: >-
+          Standby NameNode startup/health verification failed on {{ inventory_hostname }}.
+          Review the systemd journal and NameNode log diagnostics printed immediately above.
+
+# Verify that the standby NameNode remains active and accepts its RPC listener.
+- name: Verify the standby NameNode stays up and serves RPC
+  vars:
+    nn_id: "nn{{ groups['namenodes'].index(inventory_hostname) + 1 }}"
+  block:
+    - name: Wait for the standby NameNode RPC port
+      ansible.builtin.wait_for:
+        host: "{{ node_addr }}"
+        port: "{{ hdfs_nn_rpc_port }}"
+        timeout: 180
+
+    - name: Let it settle, then confirm the unit is still active
+      ansible.builtin.shell: |
+        sleep 20
+        systemctl is-active hadoop-namenode
+      register: nn_settle
+      changed_when: false
+      failed_when: nn_settle.stdout | trim != 'active'
+
+    - name: Ask the NameNode for its HA state
+      ansible.builtin.command: >-
+        {{ hadoop_run }} {{ hadoop_home }}/bin/hdfs haadmin -getServiceState {{ nn_id }}
+      environment: "{{ hadoop_env | combine({'HDFS_NAMENODE_OPTS': ''}) }}"
+      register: nn_ha_state
+      changed_when: false
+      retries: 6
+      delay: 5
+      until: nn_ha_state.rc == 0 and (nn_ha_state.stdout | trim) in ['standby', 'active']
+
+  rescue:
+    - name: Collect why the standby NameNode is not healthy
+      ansible.builtin.shell: |
+        echo "--- systemctl status hadoop-namenode ---"
+        systemctl status hadoop-namenode --no-pager -l 2>&1 | tail -n 15
+        echo "--- journalctl -u hadoop-namenode (last 60) ---"
+        journalctl -u hadoop-namenode --no-pager -n 60 2>&1
+        echo "--- errors/fatals in the journal ---"
+        journalctl -u hadoop-namenode --no-pager -n 400 2>&1 | grep -E 'FATAL|ERROR|Exception|Caused by' | tail -n 20
+        echo "--- OOM killer / kernel kills ---"
+        (dmesg -T 2>/dev/null | grep -i -E 'out of memory|killed process' | tail -n 5) || true
+        echo "--- memory ---"
+        free -m | head -2
+        exit 0
+      register: nn_diag
+      changed_when: false
+      failed_when: false
+
+    - name: Print the diagnostics
+      ansible.builtin.debug:
+        var: nn_diag.stdout_lines
+
+    - name: Fail with a pointer to the cause
+      ansible.builtin.fail:
+        msg: "Standby NameNode {{ nn_id }} on {{ inventory_hostname }} did not stay up or does not answer RPC; read the diagnostics above."
+
+# ZKFC is NOT started here on purpose. It is started on both NameNodes, in inventory order, by the next play
+# (ha_zkfc.yml). Starting it here made the ZKFC of the standby the only candidate, so the standby NameNode
+# was elected the first active before the first NameNode's ZKFC even existed.

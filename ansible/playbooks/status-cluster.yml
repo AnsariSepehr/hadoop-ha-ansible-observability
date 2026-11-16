@@ -1,0 +1,16 @@
+---
+- ansible.builtin.import_playbook: zookeeper/3.8.4/status.yml
+- ansible.builtin.import_playbook: hadoop/3.3.6/status.yml
+- ansible.builtin.import_playbook: mysql/8.0.42/status.yml
+- name: Other services
+  hosts: hive_servers:spark_history_servers:kafka_brokers
+  tasks:
+    - ansible.builtin.command: "systemctl is-active {{ item }}"
+      loop: "{{ (['hive-metastore', 'hive-server2'] if inventory_hostname in groups.get('hive_servers', []) else [])
+              + (['spark-history-server'] if inventory_hostname in groups.get('spark_history_servers', []) else [])
+              + (['kafka'] if inventory_hostname in groups.get('kafka_brokers', []) else []) }}"
+      register: svc
+      changed_when: false
+      failed_when: false
+    - ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ svc.results | map(attribute='item') | zip(svc.results | map(attribute='stdout')) | map('join', '=') | join('  ') }}"

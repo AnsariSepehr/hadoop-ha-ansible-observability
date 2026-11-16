@@ -1,0 +1,97 @@
+---
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Kafka group
+  ansible.builtin.group:
+    name: "{{ kafka_group }}"
+    system: true
+
+- name: Does the kafka user already exist?
+  ansible.builtin.command: id {{ kafka_user }}
+  register: kafka_user_check
+  failed_when: false
+  changed_when: false
+
+- name: Kafka user
+  ansible.builtin.user:
+    name: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ kafka_user_home }}"
+    create_home: false
+  when: kafka_user_check.rc != 0
+
+- name: Directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0750"
+  loop: ["{{ kafka_data_dir }}", "{{ kafka_log_dir }}", "{{ kafka_user_home }}"]
+
+- name: Install Kafka binaries
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: install_tarball
+  vars:
+    pkg_label: kafka
+    pkg_src: "{{ kafka_package }}"
+    pkg_dir: "{{ install_root }}/kafka-{{ kafka_version }}"
+    pkg_link: "{{ kafka_home }}"
+    pkg_owner: "{{ kafka_user }}"
+    pkg_group: "{{ kafka_group }}"
+
+- name: KRaft broker configuration
+  ansible.builtin.template:
+    src: server.properties.j2
+    dest: "{{ kafka_home }}/config/server.properties"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0640"
+  notify: Restart kafka
+
+- name: Has the storage been formatted?
+  ansible.builtin.stat:
+    path: "{{ kafka_data_dir }}/meta.properties"
+  register: kafka_meta
+
+- name: Format the KRaft storage (once per broker)
+  ansible.builtin.command: >-
+    {{ kafka_home }}/bin/kafka-storage.sh format -t {{ kafka_cluster_id }}
+    -c {{ kafka_home }}/config/server.properties
+  environment:
+    JAVA_HOME: "{{ kafka_java_home }}"
+  become: true
+  become_user: "{{ kafka_user }}"
+  when: not kafka_meta.stat.exists
+  changed_when: true
+
+- name: systemd unit
+  ansible.builtin.template:
+    src: kafka.service.j2
+    dest: /etc/systemd/system/kafka.service
+    mode: "0644"
+  notify: Restart kafka
+
+- name: Helper that runs Kafka CLI tools with Java 17 regardless of the shell's JAVA_HOME
+  ansible.builtin.copy:
+    dest: /usr/local/bin/kafka-cli
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      # usage: kafka-cli kafka-topics.sh --list --bootstrap-server host:{{ kafka_broker_port }}
+      export JAVA_HOME={{ kafka_java_home }}
+      tool="$1"; shift
+      exec {{ kafka_home }}/bin/"$tool" "$@"
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Configure Kafka JMX exporter
+  ansible.builtin.import_tasks: jmx-exporter.yml
+  when: kafka_jmx_enabled | bool

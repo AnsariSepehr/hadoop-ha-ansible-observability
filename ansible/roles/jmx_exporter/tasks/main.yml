@@ -1,0 +1,41 @@
+---
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Create the exporter directory
+  ansible.builtin.file:
+    path: "{{ jmx_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+
+- name: Check the exporter jar on the control node
+  ansible.builtin.stat:
+    path: "{{ jmx_exporter_package }}"
+  delegate_to: localhost
+  become: false
+  register: jmx_local
+
+- name: Fail if the jar is missing
+  ansible.builtin.fail:
+    msg: "JMX exporter jar not found: {{ jmx_exporter_package }}"
+  when: not jmx_local.stat.exists
+
+- name: Install the Java agent jar
+  ansible.builtin.copy:
+    src: "{{ jmx_exporter_package }}"
+    dest: "{{ jmx_dir }}/{{ jmx_jar }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+
+- name: Install the exporter configuration
+  ansible.builtin.template:
+    src: jmx-config.yml.j2
+    dest: "{{ jmx_config }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"

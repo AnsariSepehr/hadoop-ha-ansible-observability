@@ -1,0 +1,42 @@
+---
+# Opens ports with firewall-cmd, permanent + runtime, WITHOUT --reload
+# (a reload can drop rules managed by Docker/Kubernetes).
+- name: Is firewalld running?
+  ansible.builtin.command: systemctl is-active firewalld
+  register: zeppelin_fw_active
+  changed_when: false
+  failed_when: false
+
+- name: Open Zeppelin ports in firewalld
+  when: zeppelin_fw_active.stdout == 'active'
+  block:
+    - name: Build the list of rules
+      ansible.builtin.set_fact:
+        zeppelin_fw_rules: >-
+          {{ [ {'kind': 'port', 'arg': zeppelin_port ~ '/tcp'} ]
+             + ( [ {'kind': 'rich', 'arg': 'rule family="ipv4" source address="' ~ zeppelin_prometheus_ip ~ '" port port="' ~ zeppelin_jmx_port ~ '" protocol="tcp" accept'} ]
+                 if zeppelin_prometheus_ip | length > 0
+                 else [ {'kind': 'port', 'arg': zeppelin_jmx_port ~ '/tcp'} ] ) }}
+
+    - name: Check which rules are already permanent
+      ansible.builtin.command: >-
+        firewall-cmd --permanent --query-{{ 'rich-rule' if item.kind == 'rich' else 'port' }}={{ item.arg | quote }}
+      loop: "{{ zeppelin_fw_rules }}"
+      register: zeppelin_fw_query
+      changed_when: false
+      failed_when: false
+
+    - name: Add missing permanent rules
+      ansible.builtin.command: >-
+        firewall-cmd --permanent --add-{{ 'rich-rule' if item.item.kind == 'rich' else 'port' }}={{ item.item.arg | quote }}
+      loop: "{{ zeppelin_fw_query.results }}"
+      loop_control:
+        label: "{{ item.item.arg }}"
+      when: item.rc != 0
+
+    - name: Apply the same rules to the running firewall
+      ansible.builtin.command: >-
+        firewall-cmd --add-{{ 'rich-rule' if item.kind == 'rich' else 'port' }}={{ item.arg | quote }}
+      loop: "{{ zeppelin_fw_rules }}"
+      changed_when: false
+      failed_when: false

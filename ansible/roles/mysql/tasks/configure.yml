@@ -1,0 +1,237 @@
+---
+# Bring a node from "RPMs installed" to "mysqld running and secured".
+# Ordered so every precondition for `mysqld --initialize-insecure` is satisfied:
+#   1. GR config absent
+#   2. data dir empty (or already initialised)
+#   3. error log writable by mysql
+#   4. runtime dir exists
+#   5. SELinux contexts correct
+
+- name: Base configuration
+  ansible.builtin.template:
+    src: my.cnf.j2
+    dest: /etc/my.cnf
+    mode: "0644"
+    backup: true
+  notify: Restart mysqld
+
+- name: Replication-safe settings (no group_replication options yet)
+  ansible.builtin.template:
+    src: mysql-base.cnf.j2
+    dest: /etc/my.cnf.d/kadoop-base.cnf
+    mode: "0644"
+  notify: Restart mysqld
+
+# ---------------------------------------------------------------------------
+# Preconditions for --initialize-insecure
+# ---------------------------------------------------------------------------
+
+- name: Data directory
+  ansible.builtin.file:
+    path: "{{ mysql_data_dir }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: "0750"
+
+- name: Runtime directory
+  ansible.builtin.file:
+    path: /var/run/mysqld
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: "0755"
+
+- name: Is the data directory initialised?
+  ansible.builtin.stat:
+    path: "{{ mysql_data_dir }}/mysql.ibd"
+  register: mysql_init_state
+
+- name: Look for leftovers in the data directory
+  ansible.builtin.find:
+    paths: "{{ mysql_data_dir }}"
+    file_type: any
+    hidden: true
+    patterns:
+      - "*"
+    excludes:
+      - lost+found
+  register: mysql_dir_contents
+  when: not mysql_init_state.stat.exists
+
+- name: Refuse to erase an uninitialised MySQL data directory containing files
+  ansible.builtin.assert:
+    that:
+      - mysql_force_reinit | bool or (mysql_dir_contents.matched | default(0) | int) == 0
+    fail_msg: >-
+      {{ mysql_data_dir }} contains files but mysql.ibd is absent. The role will not automatically
+      delete a partial or recoverable MySQL data directory. Inspect it and take a backup; only use
+      mysql_force_reinit=true with confirm_destroy_data=yes when a full reinitialisation is intended.
+  when: not mysql_init_state.stat.exists
+
+- name: Guard a forced re-initialisation
+  ansible.builtin.assert:
+    that: confirm_destroy_data | default('no') == 'yes'
+    fail_msg: "Re-initialising deletes all MySQL data. Add: -e confirm_destroy_data=yes"
+  when: mysql_force_reinit | bool
+
+- name: Forced wipe (only when mysql_force_reinit=true)
+  when: mysql_force_reinit | bool
+  ansible.builtin.shell: |
+    set +e
+    systemctl stop mysqld 2>/dev/null || true
+    if pgrep -x mysqld >/dev/null 2>&1; then
+      pkill -TERM -x mysqld 2>/dev/null || true
+      for i in $(seq 1 15); do
+        pgrep -x mysqld >/dev/null 2>&1 || break
+        sleep 1
+      done
+      pgrep -x mysqld >/dev/null 2>&1 && pkill -KILL -x mysqld 2>/dev/null || true
+    fi
+    find "{{ mysql_data_dir }}" -mindepth 1 -maxdepth 1 ! -name lost+found -exec rm -rf -- {} +
+    mkdir -p {{ mysql_data_dir }} /var/run/mysqld
+    chown -R mysql:mysql {{ mysql_data_dir }} /var/run/mysqld
+    chmod 0750 {{ mysql_data_dir }}
+    restorecon -R {{ mysql_data_dir }} /var/run/mysqld 2>/dev/null
+    exit 0
+  changed_when: true
+  register: mysql_forced_wipe
+
+- name: Determine whether MySQL must be initialized in this run
+  ansible.builtin.set_fact:
+    mysql_needs_init: "{{ (not mysql_init_state.stat.exists) or (mysql_force_reinit | bool) }}"
+
+- name: Remove the Group Replication config before initialising
+  ansible.builtin.file:
+    path: /etc/my.cnf.d/kadoop-gr.cnf
+    state: absent
+  when: mysql_needs_init | bool
+
+- name: Ensure the mysqld error log exists with correct ownership
+  ansible.builtin.file:
+    path: "{{ mysql_error_log }}"
+    state: touch
+    owner: mysql
+    group: mysql
+    mode: "0640"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Restore SELinux context on the error log
+  ansible.builtin.command: restorecon -v {{ mysql_error_log }}
+  changed_when: false
+  failed_when: false
+
+# ---------------------------------------------------------------------------
+# Initialise
+# ---------------------------------------------------------------------------
+
+# The role owns only kadoop-gr.cnf. Do not recursively rewrite arbitrary files
+# under /etc: other applications or operators may maintain independent MySQL
+# settings there. The dedicated GR file was removed above before first init.
+
+- name: Initialise the data directory (root without password, secured below)
+  when: mysql_needs_init | bool
+  block:
+    - name: Run mysqld --initialize-insecure
+      ansible.builtin.command: >-
+        {{ mysqld_binary }} --initialize-insecure --user=mysql
+        --datadir={{ mysql_data_dir }} --log-error={{ mysql_error_log }}
+      register: mysql_init
+      changed_when: true
+      failed_when: mysql_init.rc != 0
+
+    - name: Restore SELinux contexts after init
+      ansible.builtin.shell: |
+        command -v restorecon >/dev/null && restorecon -R {{ mysql_data_dir }} {{ mysql_error_log }} || true
+      changed_when: false
+
+  rescue:
+    - name: Show the tail of the mysqld error log when init fails
+      ansible.builtin.shell: "tail -n 60 {{ mysql_error_log }}"
+      register: mysql_init_err_log
+      changed_when: false
+      failed_when: false
+
+    - name: Print the error log
+      ansible.builtin.debug:
+        var: mysql_init_err_log.stdout_lines
+
+    - name: Fail with the real reason
+      ansible.builtin.fail:
+        msg: "mysqld --initialize-insecure failed. See the log above."
+
+# ---------------------------------------------------------------------------
+# Start and secure
+# ---------------------------------------------------------------------------
+
+
+- name: Start and enable mysqld
+  ansible.builtin.systemd:
+    name: mysqld
+    state: started
+    enabled: true
+
+- name: Apply pending configuration changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for the socket
+  ansible.builtin.wait_for:
+    path: "{{ mysql_socket }}"
+    timeout: 120
+
+- name: Can we log in without a password?
+  ansible.builtin.command: mysql --no-defaults -uroot -S {{ mysql_socket }} -e "SELECT 1"
+  register: mysql_blank_login
+  failed_when: false
+  changed_when: false
+
+- name: Set the root password (first run only)
+  ansible.builtin.command:
+    argv:
+      - mysql
+      - --no-defaults
+      - -uroot
+      - "-S{{ mysql_socket }}"
+      - -e
+      - "SET SESSION sql_log_bin=0; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}'; FLUSH PRIVILEGES;"
+  when: mysql_blank_login.rc == 0
+  no_log: true
+
+- name: Root client credentials for administration (/root/.my.cnf)
+  ansible.builtin.copy:
+    dest: /root/.my.cnf
+    mode: "0600"
+    content: |
+      [client]
+      user=root
+      password="{{ mysql_root_password }}"
+      socket={{ mysql_socket }}
+  no_log: true
+
+- name: Verify the root password works
+  ansible.builtin.command: mysql -e "SELECT @@version"
+  register: mysql_version_check
+  changed_when: false
+
+- name: Is this node writable? (group members other than the primary are read-only)
+  ansible.builtin.command: mysql -Nse "SELECT @@super_read_only"
+  register: mysql_ro
+  changed_when: false
+
+- name: Replication accounts and recovery credentials (local only, not replicated)
+  ansible.builtin.command:
+    argv:
+      - mysql
+      - -e
+      - >-
+        SET SESSION sql_log_bin=0;
+        CREATE USER IF NOT EXISTS '{{ mysql_repl_user }}'@'%' IDENTIFIED BY '{{ mysql_repl_password }}';
+        ALTER USER '{{ mysql_repl_user }}'@'%' IDENTIFIED BY '{{ mysql_repl_password }}';
+        GRANT REPLICATION SLAVE, BACKUP_ADMIN, CONNECTION_ADMIN, GROUP_REPLICATION_STREAM ON *.* TO '{{ mysql_repl_user }}'@'%';
+        FLUSH PRIVILEGES;
+        CHANGE REPLICATION SOURCE TO SOURCE_USER='{{ mysql_repl_user }}', SOURCE_PASSWORD='{{ mysql_repl_password }}'
+        FOR CHANNEL 'group_replication_recovery';
+  when: mysql_gr_enabled | bool and mysql_ro.stdout | trim == '0'
+  no_log: true
+  changed_when: true

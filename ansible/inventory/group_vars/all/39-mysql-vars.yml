@@ -1,0 +1,4 @@
+---
+mysql_data_dir: /var/lib/mysql
+mysql_socket: /var/lib/mysql/mysql.sock
+mysql_error_log: /var/log/mysqld.log

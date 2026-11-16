@@ -1,0 +1,9 @@
+---
+# Environment map used by hadoop CLI tasks (yarn.yml, status.yml, ...)
+hadoop_env:
+  JAVA_HOME: "{{ hadoop_java_home }}"
+  HADOOP_HOME: "{{ hadoop_home }}"
+  HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"
+  HADOOP_LOG_DIR: "{{ hadoop_log_dir }}"
+  HADOOP_PID_DIR: "{{ hadoop_pid_dir }}"
+  HOME: "{{ hadoop_user_home }}"

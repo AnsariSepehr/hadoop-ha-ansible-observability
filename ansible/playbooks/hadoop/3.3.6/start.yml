@@ -1,0 +1,20 @@
+---
+# Ordered start of the whole Hadoop layer (use after maintenance; services are also enabled at boot).
+- name: JournalNodes
+  hosts: journalnodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_journalnode }
+- name: NameNodes
+  hosts: namenodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: service }
+      vars: { svc: namenode, svc_port: "{{ hdfs_nn_rpc_port }}" }
+- name: ZKFC
+  hosts: namenodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_zkfc }
+- name: DataNodes
+  hosts: datanodes
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ha_datanode }
+- ansible.builtin.import_playbook: yarn.yml

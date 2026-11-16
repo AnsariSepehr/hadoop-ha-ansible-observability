@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+[Unit]
+Description={{ item.desc }}
+After=network-online.target{% if item.requires %} {{ item.requires }}{% endif %}
+
+Wants=network-online.target
+{% if item.requires %}
+Requires={{ item.requires }}
+{% endif %}
+
+[Service]
+Type=simple
+User={{ hadoop_user }}
+Group={{ hadoop_group }}
+Environment="HADOOP_USER_NAME={{ hadoop_user }}"
+ExecStart={{ hive_home }}/bin/{{ item.run }}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE={{ common_limits_nofile }}
+# No StandardOutput=append:<file> here. systemd itself opens that file before the JVM starts; on an
+# SELinux-enforcing host it cannot create files under /opt (status=209/STDOUT, "Permission denied").
+# stdout/stderr go to the journal (journalctl -u {{ item.unit }}); the JVM still writes
+# {{ hive_log_dir }}/{{ item.log }} through log4j (-Dhive.log.dir / -Dhive.log.file in the wrapper).
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

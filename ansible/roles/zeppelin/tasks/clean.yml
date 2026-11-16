@@ -1,0 +1,48 @@
+---
+# Removes the service and the installation. Notebooks are kept unless
+# -e zeppelin_clean_data=true is passed.
+- name: Safety check on paths
+  ansible.builtin.assert:
+    that:
+      - zeppelin_home | length > 6
+      - zeppelin_home is match('^/[^/]+/.+')
+    quiet: true
+
+- name: Stop and disable the zeppelin service
+  ansible.builtin.systemd:
+    name: "{{ zeppelin_service_name }}"
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Remove the systemd unit
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ zeppelin_service_name }}.service"
+    state: absent
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Remove the symlink
+  ansible.builtin.file:
+    path: "{{ zeppelin_symlink }}"
+    state: absent
+
+- name: Remove the whole installation (including notebooks)
+  ansible.builtin.file:
+    path: "{{ zeppelin_home }}"
+    state: absent
+  when: zeppelin_clean_data | bool
+
+- name: Remove the installation but keep the notebook directory
+  ansible.builtin.shell: >-
+    find '{{ zeppelin_home }}' -mindepth 1 -maxdepth 1 ! -name notebook -exec rm -rf {} +
+  args:
+    removes: "{{ zeppelin_home }}"
+  when: not (zeppelin_clean_data | bool)
+
+- name: Remove the Zeppelin JMX config
+  ansible.builtin.file:
+    path: "{{ zeppelin_jmx_dir }}/zeppelin-jmx.yml"
+    state: absent

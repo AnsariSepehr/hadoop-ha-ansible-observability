@@ -1,0 +1,166 @@
+---
+# Common lifecycle for Hadoop daemons.
+# Inputs: svc, svc_port (required for listeners), svc_state (started|stopped|restarted),
+#         svc_health_host (defaults to this node's advertised address).
+
+- name: Ensure the YARN node-attribute store has persistent ownership at boot
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/hadoop-yarn-node-attributes.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      d {{ yarn_node_attribute_store_dir | default('/tmp/hadoop-yarn-hadoop') }} 0755 {{ hadoop_user }} {{ hadoop_group }} -
+      d {{ yarn_node_attribute_store_dir | default('/tmp/hadoop-yarn-hadoop') }}/node-attribute 0755 {{ hadoop_user }} {{ hadoop_group }} -
+  when:
+    - svc == 'resourcemanager'
+    - (svc_state | default('started')) != 'stopped'
+
+- name: Create the YARN node-attribute store now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/hadoop-yarn-node-attributes.conf
+  changed_when: false
+  when:
+    - svc == 'resourcemanager'
+    - (svc_state | default('started')) != 'stopped'
+
+- name: Repair ownership of existing YARN node-attribute store contents
+  ansible.builtin.file:
+    path: "{{ yarn_node_attribute_store_dir | default('/tmp/hadoop-yarn-hadoop') }}/node-attribute"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    recurse: true
+  when:
+    - svc == 'resourcemanager'
+    - (svc_state | default('started')) != 'stopped'
+
+- name: "hadoop-{{ svc }} - determine current health"
+  ansible.builtin.shell: |
+    set -eu
+    state=$(systemctl is-active "hadoop-{{ svc }}" 2>/dev/null || true)
+    if [ "$state" != active ]; then
+      echo unhealthy
+      exit 0
+    fi
+    {% if svc_port is defined %}
+    if ! ss -H -lnt "sport = :{{ svc_port }}" 2>/dev/null | grep -q .; then
+      echo unhealthy
+      exit 0
+    fi
+    {% endif %}
+    echo healthy
+  args:
+    executable: /bin/bash
+  register: hadoop_health
+  changed_when: false
+  when: (svc_state | default('started')) != 'stopped'
+
+- name: "hadoop-{{ svc }} - stop stale or explicitly restarted daemon"
+  ansible.builtin.systemd:
+    name: "hadoop-{{ svc }}"
+    state: stopped
+  when:
+    - (svc_state | default('started')) != 'stopped'
+    - (hadoop_health.stdout | default('unhealthy') | trim) != 'healthy' or (svc_state | default('started')) == 'restarted'
+
+- name: "hadoop-{{ svc }} - terminate only this daemon's orphaned JVM"
+  vars:
+    hadoop_daemon_pattern: >-
+      {{ {
+        'namenode':        'org[.]apache[.]hadoop[.]hdfs[.]server[.]namenode[.]NameNode',
+        'datanode':        'org[.]apache[.]hadoop[.]hdfs[.]server[.]datanode[.]DataNode',
+        'journalnode':     'org[.]apache[.]hadoop[.]hdfs[.]qjournal[.]server[.]JournalNode',
+        'zkfc':            'org[.]apache[.]hadoop[.]hdfs[.]tools[.]DFSZKFailoverController',
+        'resourcemanager': 'org[.]apache[.]hadoop[.]yarn[.]server[.]resourcemanager[.]ResourceManager',
+        'nodemanager':     'org[.]apache[.]hadoop[.]yarn[.]server[.]nodemanager[.]NodeManager',
+        'historyserver':   'org[.]apache[.]hadoop[.]mapreduce[.]v2[.]hs[.]JobHistoryServer'
+      }[svc] | default('') }}
+  ansible.builtin.shell: |
+    set -eu
+    pattern='{{ hadoop_daemon_pattern }}'
+    [ -n "$pattern" ] || exit 0
+    pids=$(pgrep -u '{{ hadoop_user }}' -f "$pattern" 2>/dev/null || true)
+    [ -n "$pids" ] || exit 0
+    kill -TERM $pids 2>/dev/null || true
+    for attempt in $(seq 1 15); do
+      alive=''
+      for pid in $pids; do
+        kill -0 "$pid" 2>/dev/null && alive="$alive $pid"
+      done
+      [ -z "$alive" ] && exit 0
+      sleep 1
+    done
+    for pid in $pids; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - (svc_state | default('started')) != 'stopped'
+    - (hadoop_health.stdout | default('unhealthy') | trim) != 'healthy' or (svc_state | default('started')) == 'restarted'
+
+- name: "hadoop-{{ svc }} - remove this daemon's stale PID file"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hadoop_pid_dir }}/hadoop-{{ hadoop_user }}-{{ svc }}.pid"
+  when:
+    - (svc_state | default('started')) != 'stopped'
+    - (hadoop_health.stdout | default('unhealthy') | trim) != 'healthy' or (svc_state | default('started')) == 'restarted'
+
+- name: "hadoop-{{ svc }} - ensure the listener port is free before starting"
+  ansible.builtin.shell: |
+    set -eu
+    for attempt in $(seq 1 30); do
+      if ! ss -H -lnt "sport = :{{ svc_port }}" 2>/dev/null | grep -q .; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Port {{ svc_port }} is still in use after stopping hadoop-{{ svc }}" >&2
+    ss -lntp "sport = :{{ svc_port }}" >&2 || true
+    exit 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when:
+    - svc_port is defined
+    - (svc_state | default('started')) != 'stopped'
+    - (hadoop_health.stdout | default('unhealthy') | trim) != 'healthy' or (svc_state | default('started')) == 'restarted'
+
+- name: "hadoop-{{ svc }} - start or stop systemd unit"
+  ansible.builtin.systemd:
+    name: "hadoop-{{ svc }}"
+    state: "{{ 'stopped' if (svc_state | default('started')) == 'stopped' else 'started' }}"
+    enabled: "{{ (svc_state | default('started')) != 'stopped' }}"
+    daemon_reload: true
+
+- name: "hadoop-{{ svc }} - verify systemd is active"
+  ansible.builtin.command: "systemctl is-active hadoop-{{ svc }}"
+  register: hadoop_unit_state
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: hadoop_unit_state.rc == 0 and hadoop_unit_state.stdout | trim == 'active'
+  when: (svc_state | default('started')) != 'stopped'
+
+- name: "hadoop-{{ svc }} - verify listener on {{ svc_health_host | default(node_addr) }}:{{ svc_port | default('n/a') }}"
+  ansible.builtin.wait_for:
+    host: "{{ svc_health_host | default(node_addr) }}"
+    port: "{{ svc_port }}"
+    state: started
+    connect_timeout: 5
+    sleep: 2
+    timeout: "{{ svc_timeout | default(180) }}"
+  when:
+    - svc_port is defined
+    - (svc_state | default('started')) != 'stopped'
+
+- name: "hadoop-{{ svc }} - verify unit remains active after listener check"
+  ansible.builtin.command: "systemctl is-active hadoop-{{ svc }}"
+  register: hadoop_unit_final
+  changed_when: false
+  failed_when: hadoop_unit_final.rc != 0 or hadoop_unit_final.stdout | trim != 'active'
+  when: (svc_state | default('started')) != 'stopped'

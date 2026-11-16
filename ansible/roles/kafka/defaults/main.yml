@@ -1,0 +1,11 @@
+---
+kafka_user: kafka
+kafka_group: kafka
+kafka_user_home: /var/lib/kafka-home      # must NOT be the data directory
+kafka_auto_create_topics: false
+kafka_min_isr: "{{ [kafka_broker_count | int - 1, 1] | max }}"
+kafka_replication_factor: "{{ [kafka_broker_count | int, 3] | min }}"
+kafka_test_topic: kadoop-smoke-test
+kafka_jmx_enabled: "{{ jmx_exporter_enabled | default(true) }}"
+kafka_jmx_port: 7084
+kafka_jmx_config: "{{ jmx_dir }}/kafka-jmx.yml"

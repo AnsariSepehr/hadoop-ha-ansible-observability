@@ -1,0 +1,34 @@
+---
+# Binaries + units on every Hive host (needs Hadoop installed first).
+- name: Hive 3.1.3 - install
+  hosts: hive_servers
+  vars:
+    expected_version: "3.1.3"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: hive_version == expected_version
+        fail_msg: "hive_version={{ hive_version }} but this playbook directory is for {{ expected_version }}. Copy it to the matching version directory."
+      run_once: true
+  roles:
+    - hive
+
+# Metastore database, hive-site.xml, schema.  Needs: MySQL up, HDFS up.
+- name: Find the MySQL primary
+  hosts: mysql
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: discover_primary }
+      when: inventory_hostname == groups['mysql'][0]
+
+- name: HDFS directories for Hive
+  hosts: namenodes[0]
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: hdfs_dirs }
+      vars: { hdfs_extra_dirs: "{{ hdfs_hive_dirs }}" }
+
+- name: Hive Metastore database and schema
+  hosts: hive_servers
+  tasks:
+    - ansible.builtin.include_role: { name: hive, tasks_from: metastore }
+
+- ansible.builtin.import_playbook: start.yml

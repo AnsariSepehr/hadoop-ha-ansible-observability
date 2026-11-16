@@ -1,0 +1,30 @@
+---
+- ansible.builtin.import_playbook: ../../_lib/generate-ids.yml
+
+- name: MySQL 8.0.42 - install and configure every node
+  hosts: mysql
+  vars:
+    expected_version: "8.0.42"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: mysql_version == expected_version
+        fail_msg: "mysql_version={{ mysql_version }} but this playbook directory is for {{ expected_version }}. Copy it to the matching version directory."
+      run_once: true
+  roles:
+    - mysql
+
+- name: Group Replication - bootstrap the first node
+  hosts: mysql[0]
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: gr_bootstrap }
+      when: mysql_gr_enabled | bool
+
+- name: Group Replication - join the other nodes one by one
+  hosts: mysql[1:]
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: gr_join }
+      when: mysql_gr_enabled | bool
+
+- ansible.builtin.import_playbook: status.yml

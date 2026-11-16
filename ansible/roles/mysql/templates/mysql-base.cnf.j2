@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+[mysqld]
+server_id={{ mysql_server_id }}
+gtid_mode=ON
+enforce_gtid_consistency=ON
+log_bin=binlog
+binlog_format=ROW
+log_replica_updates=ON
+relay_log_recovery=ON
+binlog_expire_logs_seconds=604800

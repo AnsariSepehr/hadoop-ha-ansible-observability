@@ -1,0 +1,14 @@
+---
+# Installs only the agent jar + config. Services pick it up automatically (jmx_exporter_enabled) on their next (re)start.
+- name: JMX exporter 1.1.0
+  hosts: cluster
+  vars:
+    expected_version: "1.1.0"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: jmx_exporter_version == expected_version
+        fail_msg: "jmx_exporter_version={{ jmx_exporter_version }} but this playbook directory is for {{ expected_version }}. Copy it to the matching version directory."
+      run_once: true
+  roles:
+    - jmx_exporter

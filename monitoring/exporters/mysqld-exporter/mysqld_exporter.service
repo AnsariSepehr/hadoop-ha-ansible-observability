@@ -1,0 +1,16 @@
+[Unit]
+Description=Prometheus mysqld_exporter
+After=mysqld.service
+
+[Service]
+User=mysqld_exporter
+Group=mysqld_exporter
+ExecStart=/opt/mysqld_exporter/mysqld_exporter \
+  --config.my-cnf=/etc/mysqld_exporter.cnf \
+  --web.listen-address=:9104 \
+  --collect.perf_schema.replication_group_members \
+  --collect.perf_schema.replication_group_member_stats
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

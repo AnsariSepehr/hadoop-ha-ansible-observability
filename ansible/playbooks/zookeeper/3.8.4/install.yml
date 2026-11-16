@@ -1,0 +1,22 @@
+---
+- name: ZooKeeper 3.8.4 - install, configure, start
+  hosts: zookeepers
+  vars:
+    expected_version: "3.8.4"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: zookeeper_version == expected_version
+        fail_msg: "zookeeper_version={{ zookeeper_version }} but this playbook directory is for {{ expected_version }}. Use playbooks/zookeeper/{{ zookeeper_version }}/ (copy this directory for a new version)."
+      run_once: true
+  roles:
+    - zookeeper
+  post_tasks:
+    - name: Start ZooKeeper
+      ansible.builtin.include_role:
+        name: zookeeper
+        tasks_from: start
+    - name: Verify the quorum
+      ansible.builtin.include_role:
+        name: zookeeper
+        tasks_from: verify

@@ -1,0 +1,30 @@
+---
+- name: Is the zeppelin service active?
+  ansible.builtin.command: "systemctl is-active {{ zeppelin_service_name }}"
+  register: zeppelin_active
+  changed_when: false
+  failed_when: false
+
+- name: Zeppelin REST API
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ zeppelin_port }}/api/version"
+    return_content: true
+    status_code: [200, -1]
+  register: zeppelin_api
+  failed_when: false
+  changed_when: false
+
+- name: JMX exporter metrics
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ zeppelin_jmx_port }}/metrics"
+    status_code: [200, -1]
+  register: zeppelin_jmx
+  failed_when: false
+  changed_when: false
+
+- name: Report
+  ansible.builtin.debug:
+    msg: >-
+      service={{ zeppelin_active.stdout }},
+      api={{ 'up ' ~ ((zeppelin_api.content | default('{}') | from_json).body.version | default('?')) if zeppelin_api.status | default(-1) == 200 else 'down' }}
+      jmx={{ 'up' if zeppelin_jmx.status | default(-1) == 200 else 'DOWN' }} (port {{ zeppelin_jmx_port }})

@@ -1,0 +1,12 @@
+---
+# Zeppelin status
+# Run: ansible-playbook playbooks/zeppelin/0.12.1/status.yml
+- name: Zeppelin status
+  hosts: zeppelin
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run zeppelin role (status)
+      ansible.builtin.include_role:
+        name: zeppelin
+        tasks_from: status

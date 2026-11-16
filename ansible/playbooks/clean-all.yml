@@ -1,0 +1,165 @@
+---
+# Full teardown of this project's services, binaries, configs, and data.
+# This is destructive. It intentionally leaves OS-managed Java RPMs and
+# service accounts unless separately requested.
+#
+# Run:
+#   ansible-playbook -i inventory/production.yml playbooks/clean-all.yml \
+#     --ask-vault-pass -b -e confirm_destroy_data=yes
+# Optional: also remove the hadoop/kafka service accounts and their home dirs:
+#   -e remove_service_accounts=yes
+
+- name: Pre-stop all known Kadoop services on cluster nodes
+  hosts: cluster
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Require explicit confirmation before destructive cleanup
+      ansible.builtin.assert:
+        that:
+          - confirm_destroy_data | default('no') | string == 'yes'
+        fail_msg: >-
+          Refusing full cluster cleanup. Re-run with
+          -e confirm_destroy_data=yes after verifying the inventory.
+      run_once: true
+
+    - name: Stop and disable every known current and legacy service unit
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: false
+      loop:
+        - kafka.service
+        - spark-history-server.service
+        - hive-server2.service
+        - hive-metastore.service
+        - mysqld.service
+        - hadoop-historyserver.service
+        - hadoop-nodemanager.service
+        - hadoop-resourcemanager.service
+        - hadoop-datanode.service
+        - hadoop-zkfc.service
+        - hadoop-namenode.service
+        - hadoop-journalnode.service
+        - namenode.service
+        - journalnode.service
+        - zookeeper.service
+      failed_when: false
+
+- ansible.builtin.import_playbook: kafka/4.0.0/clean.yml
+- ansible.builtin.import_playbook: spark/3.5.4/clean.yml
+- ansible.builtin.import_playbook: hive/3.1.3/clean.yml
+- ansible.builtin.import_playbook: mysql/8.0.42/clean.yml
+- ansible.builtin.import_playbook: hadoop/3.3.6/clean.yml
+- ansible.builtin.import_playbook: zookeeper/3.8.4/clean.yml
+
+- name: Final sweep of stale project units, configuration, and generated artifacts
+  hosts: cluster
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Remove stale current and legacy systemd unit files
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ item }}"
+        state: absent
+      loop:
+        - kafka.service
+        - spark-history-server.service
+        - hive-server2.service
+        - hive-metastore.service
+        - zookeeper.service
+        - journalnode.service
+        - namenode.service
+        - hadoop-journalnode.service
+        - hadoop-namenode.service
+        - hadoop-zkfc.service
+        - hadoop-datanode.service
+        - hadoop-resourcemanager.service
+        - hadoop-nodemanager.service
+        - hadoop-historyserver.service
+
+    - name: Remove remaining project-managed profile, tmpfiles, tuning, and marker files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/profile.d/hadoop.sh
+        - /etc/profile.d/zookeeper.sh
+        - /etc/profile.d/hive.sh
+        - /etc/profile.d/spark.sh
+        - /etc/tmpfiles.d/hadoop.conf
+        - /etc/tmpfiles.d/hadoop-yarn-node-attributes.conf
+        - /etc/tmpfiles.d/zookeeper.conf
+        - /etc/tmpfiles.d/spark.conf
+        - /etc/security/limits.d/90-kadoop.conf
+        - /etc/sysctl.d/90-kadoop.conf
+        - /etc/sudoers.d/hadoop
+        - /etc/sudoers.d/kafka
+        - /usr/local/bin/kafka-cli
+        - /tmp/kadoop-mysql
+        - /tmp/kadoop-java17
+        - /var/run/hadoop
+        - "{{ yarn_node_attribute_store_dir | default('/tmp/hadoop-yarn-hadoop') }}"
+        - /var/run/zookeeper
+        - /var/run/spark
+        - /var/log/hadoop
+        - /var/log/zookeeper
+        - /var/log/kafka
+
+    - name: Remove Hadoop and Java tarball install links/directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ install_root }}/hadoop"
+        - "{{ install_root }}/hadoop-{{ hadoop_version }}"
+        - "{{ install_root }}/zookeeper"
+        - "{{ install_root }}/zookeeper-{{ zookeeper_version }}"
+        - "{{ install_root }}/hive"
+        - "{{ install_root }}/hive-{{ hive_version }}"
+        - "{{ install_root }}/spark"
+        - "{{ install_root }}/spark-{{ spark_version }}"
+        - "{{ install_root }}/kafka"
+        - "{{ install_root }}/kafka-{{ kafka_version }}"
+        - "{{ install_root }}/jmx_exporter"
+        - "{{ install_root }}/java8"
+        - "{{ install_root }}/java11"
+        - "{{ install_root }}/openjdk-8u492-b09"
+        - "{{ install_root }}/openjdk-11"
+
+    - name: Remove Kadoop block from /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} KADOOP CLUSTER ({{ cluster_name }})"
+        state: absent
+      when: manage_etc_hosts | bool
+
+    - name: Reload systemd and clear stale failed states
+      ansible.builtin.shell: |
+        systemctl daemon-reload
+        systemctl reset-failed || true
+      changed_when: true
+
+    - name: Optionally remove project service accounts and home directories
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: true
+        force: true
+      loop:
+        - kafka
+        - "{{ hadoop_user }}"
+      when: remove_service_accounts | default('no') | string == 'yes'
+
+- name: Remove generated cluster IDs and certificates from the control node
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Remove generated artifacts owned by this project
+      ansible.builtin.file:
+        path: "{{ generated_dir }}"
+        state: absent
+      when: confirm_destroy_data | default('no') | string == 'yes'

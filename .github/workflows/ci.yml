@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y shellcheck && pip install pyyaml yamllint ansible-core
+      - name: Shell syntax and ShellCheck
+        run: |
+          for f in scripts/*/*.sh ansible/scripts/*.sh ansible/tests/*.sh; do bash -n "$f"; done
+          shellcheck -x -S warning scripts/*/*.sh
+      - name: Repository validation (YAML, target generation, dashboards, secrets)
+        run: bash scripts/tools/validate.sh
+      - name: YAML lint of monitoring files
+        run: |
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" monitoring
+      - name: Ansible static checks
+        working-directory: ansible
+        run: python3 tests/static-check.py
+  prometheus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate targets
+        run: pip install pyyaml && python3 monitoring/prometheus/gen-targets.py --inventory ansible/inventory/production.yml --ports ansible/inventory/group_vars/all/20-ports.yml --out monitoring/prometheus/file_sd --cluster ci
+      - name: promtool
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/etc/prometheus" prom/prometheus:v3.5.5 check rules /etc/prometheus/alerts/hadoop-platform.yml

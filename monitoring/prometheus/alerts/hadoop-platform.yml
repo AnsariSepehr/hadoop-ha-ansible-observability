@@ -1,0 +1,68 @@
+# Starter alert rules. They use only series that exist in every setup
+# (`up` and the standard node_exporter metrics), so they work without
+# knowing the JMX metric names. See docs/monitoring/alerting.md for
+# service-specific rules once you have confirmed metric names in Grafana Explore.
+groups:
+  - name: platform-availability
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.hostname }} is down"
+          description: "Prometheus could not scrape {{ $labels.instance }} for 2 minutes."
+
+      - alert: NameNodeCountUnexpected
+        expr: sum(up{job="hadoop_namenode_jmx"}) < 2
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Fewer than two NameNodes are reachable"
+          description: "HDFS HA needs both NameNodes. Check hadoop-namenode and hadoop-zkfc."
+
+      - alert: ZooKeeperQuorumAtRisk
+        expr: sum(up{job="zookeeper_jmx"}) < 3
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "ZooKeeper has fewer than three reachable members"
+          description: "One more failure loses the quorum, and with it HDFS and YARN failover."
+
+      - alert: NodeManagersMissing
+        expr: sum(up{job="yarn_nodemanager_jmx"}) < 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Fewer NodeManagers reachable than expected"
+          description: "Adjust the threshold to the number of NodeManagers in your inventory."
+
+      - alert: MetastoreDatabaseMemberDown
+        expr: sum(up{job="mysqld_exporter_metastore"}) < 3
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "A Hive metastore MySQL member is not reporting"
+
+  - name: host-resources
+    rules:
+      - alert: DataDiskAlmostFull
+        expr: 100 * node_filesystem_avail_bytes{mountpoint="/data"} / node_filesystem_size_bytes{mountpoint="/data"} < 15
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Less than 15% free on /data at {{ $labels.hostname }}"
+
+      - alert: HighMemoryUse
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 90
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Memory use above 90% at {{ $labels.hostname }}"
+
+      - alert: HighCpuUse
+        expr: 100 - avg by (hostname) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 90
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU use above 90% for 15 minutes at {{ $labels.hostname }}"

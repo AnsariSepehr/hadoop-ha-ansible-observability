@@ -1,0 +1,11 @@
+---
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Install MySQL server from offline RPMs
+  ansible.builtin.include_tasks: install.yml
+
+- name: Configure, initialise and secure MySQL
+  ansible.builtin.include_tasks: configure.yml

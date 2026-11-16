@@ -1,0 +1,29 @@
+---
+- name: Spark 3.5.4 - install on every Spark client
+  hosts: spark_clients
+  vars:
+    expected_version: "3.5.4"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: spark_version == expected_version
+        fail_msg: "spark_version={{ spark_version }} but this playbook directory is for {{ expected_version }}. Copy it to the matching version directory."
+      run_once: true
+  roles:
+    - spark
+
+- name: Spark - HDFS directories and jars archive (once)
+  hosts: spark_clients[0]
+  tasks:
+    - ansible.builtin.include_role: { name: spark, tasks_from: hdfs_setup }
+
+- name: Spark History Server
+  hosts: spark_history_servers
+  tasks:
+    - ansible.builtin.include_role: { name: spark, tasks_from: history }
+
+- name: Spark - smoke test on YARN
+  hosts: spark_clients[0]
+  tasks:
+    - ansible.builtin.include_role: { name: spark, tasks_from: smoke }
+      when: spark_run_smoke_tests | default(true) | bool

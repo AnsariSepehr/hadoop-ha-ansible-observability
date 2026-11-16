@@ -1,0 +1,66 @@
+---
+# Renders every Jinja2 template of every role for every node it applies to, into /tmp/kadoop-render/<host>/.
+# Catches undefined variables, bad filters and wrong inventory-derived values without touching any server.
+#   ansible-playbook -i inventory/local-test.yml tests/render-templates.yml -e allow_default_secrets=true -e hive_mysql_host_override=192.0.2.99
+- ansible.builtin.import_playbook: ../playbooks/_lib/generate-ids.yml
+
+- name: Render all templates
+  hosts: cluster
+  gather_facts: true
+  vars:
+    out: "/tmp/kadoop-render/{{ inventory_hostname }}"
+    roles_dir: "{{ playbook_dir }}/../roles"
+    jobs:
+      - { role: zookeeper, t: zoo.cfg.j2, g: zookeepers }
+      - { role: zookeeper, t: java.env.j2, g: zookeepers }
+      - { role: zookeeper, t: zookeeper.service.j2, g: zookeepers }
+      - { role: hadoop, t: core-site.xml.j2, g: namenodes }
+      - { role: hadoop, t: hdfs-site.xml.j2, g: namenodes }
+      - { role: hadoop, t: yarn-site.xml.j2, g: nodemanagers }
+      - { role: hadoop, t: mapred-site.xml.j2, g: nodemanagers }
+      - { role: hadoop, t: hadoop-env.sh.j2, g: namenodes }
+      - { role: hadoop, t: workers.j2, g: namenodes }
+      - { role: hadoop, t: ssl-server.xml.j2, g: namenodes }
+      - { role: hadoop, t: ssl-client.xml.j2, g: namenodes }
+      - { role: mysql, t: my.cnf.j2, g: mysql }
+      - { role: mysql, t: mysql-base.cnf.j2, g: mysql }
+      - { role: mysql, t: mysql-gr.cnf.j2, g: mysql }
+      - { role: hive, t: hive-site.xml.j2, g: hive_servers }
+      - { role: spark, t: spark-defaults.conf.j2, g: spark_clients }
+      - { role: spark, t: spark-env.sh.j2, g: spark_clients }
+      - { role: spark, t: spark-history-server.service.j2, g: spark_history_servers }
+      - { role: kafka, t: server.properties.j2, g: kafka_brokers }
+      - { role: kafka, t: kafka.service.j2, g: kafka_brokers }
+      - { role: jmx_exporter, t: jmx-config.yml.j2, g: cluster }
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ roles_dir }}/{{ item }}/defaults/main.yml"
+      loop: [common, zookeeper, hadoop, mysql, hive, spark, kafka, jmx_exporter]
+
+    - name: Clean output
+      ansible.builtin.file: { path: "{{ out }}", state: absent }
+
+    - name: Create output directory
+      ansible.builtin.file: { path: "{{ out }}", state: directory, mode: "0755" }
+
+    - name: Render
+      ansible.builtin.template:
+        src: "{{ roles_dir }}/{{ item.role }}/templates/{{ item.t }}"
+        dest: "{{ out }}/{{ item.t | regex_replace('\\.j2$', '') }}"
+        mode: "0644"
+      vars:
+        hadoop_ssl_enabled: "{{ ssl_test | default(false) }}"
+      loop: "{{ jobs | selectattr('g', 'in', group_names) | list }}"
+      loop_control: { label: "{{ item.role }}/{{ item.t }}" }
+
+    - name: Render parametrised templates (units and wrappers)
+      ansible.builtin.template:
+        src: "{{ roles_dir }}/{{ item.role }}/templates/{{ item.t }}"
+        dest: "{{ out }}/{{ item.dest }}"
+        mode: "0644"
+      loop: >-
+        {{ (hadoop_units | selectattr('group', 'in', group_names) | map('combine', {'role': 'hadoop', 't': 'hadoop.service.j2'}) | map('combine', {'dest': 'hadoop-x.service'}) | list)
+           + ([{'role': 'hive', 't': 'hive-service.sh.j2', 'dest': 'hive-svc.sh', 'svc': 'metastore', 'class': 'X', 'log': 'l.log', 'jmx': 'hivemetastore'}] if 'hive_servers' in group_names else []) }}
+      loop_control:
+        label: "{{ item.t }}"

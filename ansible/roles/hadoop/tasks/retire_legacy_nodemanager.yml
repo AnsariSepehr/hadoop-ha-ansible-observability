@@ -1,0 +1,75 @@
+---
+# Retire the old daemonizing NodeManager unit before installing the canonical
+# foreground hadoop-nodemanager.service.  Use the legacy unit's own ExecStop
+# (yarn --daemon stop) so Hadoop performs a graceful shutdown. Never kill JVMs
+# or delete a live PID file here; fail closed if shutdown does not complete.
+- name: Check legacy NodeManager unit file
+  ansible.builtin.stat:
+    path: /etc/systemd/system/nodemanager.service
+  register: legacy_nm_unit_file
+
+- name: Gracefully stop and disable legacy NodeManager unit
+  ansible.builtin.systemd:
+    name: nodemanager.service
+    state: stopped
+    enabled: false
+    daemon_reload: true
+  when: legacy_nm_unit_file.stat.exists
+
+- name: Wait for legacy NodeManager JVM and web port to stop
+  ansible.builtin.shell: |
+    set -eu
+    pattern='org[.]apache[.]hadoop[.]yarn[.]server[.]nodemanager[.]NodeManager'
+    for attempt in $(seq 1 60); do
+      pids=$(pgrep -u '{{ hadoop_user }}' -f "$pattern" 2>/dev/null || true)
+      listening=$(ss -H -lnt "sport = :{{ yarn_nm_webapp_port }}" 2>/dev/null || true)
+      if [ -z "$pids" ] && [ -z "$listening" ]; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Legacy NodeManager did not stop cleanly; refusing to remove its unit." >&2
+    echo "Remaining JVM PIDs: ${pids:-none}" >&2
+    ss -lntp "sport = :{{ yarn_nm_webapp_port }}" >&2 || true
+    exit 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: legacy_nm_unit_file.stat.exists
+
+- name: Verify legacy NodeManager PID file is no longer live
+  ansible.builtin.shell: |
+    set -eu
+    pidfile='{{ hadoop_pid_dir }}/hadoop-{{ hadoop_user }}-nodemanager.pid'
+    if [ -s "$pidfile" ]; then
+      pid=$(cat "$pidfile")
+      if kill -0 "$pid" 2>/dev/null; then
+        echo "PID file still references live PID $pid" >&2
+        exit 1
+      fi
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: legacy_nm_unit_file.stat.exists
+
+- name: Remove retired legacy NodeManager unit file
+  ansible.builtin.file:
+    path: /etc/systemd/system/nodemanager.service
+    state: absent
+  when: legacy_nm_unit_file.stat.exists
+
+- name: Reload systemd after retiring legacy NodeManager unit
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: legacy_nm_unit_file.stat.exists
+
+- name: Clear failed state for retired legacy NodeManager unit
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - reset-failed
+      - nodemanager.service
+  changed_when: false
+  failed_when: false
+  when: legacy_nm_unit_file.stat.exists

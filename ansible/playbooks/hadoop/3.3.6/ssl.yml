@@ -1,0 +1,17 @@
+---
+# HTTPS for the HDFS web UIs. Prerequisite: set hadoop_ssl_enabled: true in
+# inventory/group_vars/all/00-cluster.yml (and hadoop_ssl_mode: custom +
+# certificates in .generated/ssl-custom/ if you use a real CA).
+#
+# This playbook only prepares TLS material. It does NOT start daemons — that
+# is bootstrap-ha.yml's job, which runs after this in site.yml.
+- name: Create keystores and apply the TLS configuration
+  hosts: namenodes:journalnodes:datanodes
+  pre_tasks:
+    - ansible.builtin.assert:
+        that: hadoop_ssl_enabled | bool
+        fail_msg: "Set hadoop_ssl_enabled: true in inventory/group_vars/all/00-cluster.yml first, so every later run keeps TLS."
+      run_once: true
+  tasks:
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: ssl }
+    - ansible.builtin.include_role: { name: hadoop, tasks_from: configure }

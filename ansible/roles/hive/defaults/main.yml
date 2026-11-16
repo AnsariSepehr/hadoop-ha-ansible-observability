@@ -1,0 +1,26 @@
+---
+hive_user: "{{ hadoop_user }}"
+hive_log_dir: "{{ hive_home }}/logs"
+# Local filesystem scratch used while Hive initialises each session.
+hive_local_scratch_dir: "{{ hive_home }}/local-scratch"
+hive_replace_guava: true
+hive_reinit_schema: false
+hive_schema_sql: "{{ hive_home }}/scripts/metastore/upgrade/mysql/hive-schema-{{ hive_schema_version }}.mysql.sql"
+hive_mysql_host_override: ""
+hive_db_host: "{{ hive_mysql_host_override if hive_mysql_host_override else hostvars[groups['mysql'][0]].mysql_primary_addr }}"
+
+hive_env:
+  JAVA_HOME: "{{ hive_java_home }}"
+  HADOOP_HOME: "{{ hadoop_home }}"
+  HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"
+  HIVE_HOME: "{{ hive_home }}"
+  HIVE_CONF_DIR: "{{ hive_conf_dir }}"
+  HOME: "{{ hadoop_user_home }}"
+
+hive_gr_pk_patches:
+  - { id: NEXT_TXN_ID, search: 'INSERT INTO NEXT_TXN_ID VALUES\(1\);', before: true,  sql: '/* GR_PK_PATCH_NEXT_TXN_ID */ ALTER TABLE NEXT_TXN_ID ADD PRIMARY KEY (NTXN_NEXT);' }
+  - { id: NEXT_COMPACTION_QUEUE_ID, search: 'INSERT INTO NEXT_COMPACTION_QUEUE_ID VALUES\(1\);', before: true,  sql: '/* GR_PK_PATCH_NEXT_COMPACTION_QUEUE_ID */ ALTER TABLE NEXT_COMPACTION_QUEUE_ID ADD PRIMARY KEY (NCQ_NEXT);' }
+  - { id: NEXT_LOCK_ID, search: 'INSERT INTO NEXT_LOCK_ID VALUES\(1\);', before: true,  sql: '/* GR_PK_PATCH_NEXT_LOCK_ID */ ALTER TABLE NEXT_LOCK_ID ADD PRIMARY KEY (NL_NEXT);' }
+  - { id: TXN_COMPONENTS, search: 'CREATE INDEX TC_TXNID_INDEX ON TXN_COMPONENTS \(TC_TXNID\);', before: false, sql: '/* GR_PK_PATCH_TXN_COMPONENTS */ ALTER TABLE TXN_COMPONENTS ADD PRIMARY KEY (TC_TXNID, TC_DATABASE, TC_TABLE, TC_PARTITION);' }
+  - { id: COMPLETED_TXN_COMPONENTS, search: 'CREATE INDEX COMPLETED_TXN_COMPONENTS_IDX ON COMPLETED_TXN_COMPONENTS \(CTC_DATABASE, CTC_TABLE, CTC_PARTITION\) USING BTREE;', before: false, sql: '/* GR_PK_PATCH_COMPLETED_TXN_COMPONENTS */ ALTER TABLE COMPLETED_TXN_COMPONENTS ADD PRIMARY KEY (CTC_TXNID, CTC_DATABASE, CTC_TABLE, CTC_PARTITION);' }
+  - { id: NEXT_WRITE_ID, search: 'CREATE UNIQUE INDEX NEXT_WRITE_ID_IDX ON NEXT_WRITE_ID \(NWI_DATABASE, NWI_TABLE\);', before: false, sql: '/* GR_PK_PATCH_NEXT_WRITE_ID */ ALTER TABLE NEXT_WRITE_ID ADD PRIMARY KEY (NWI_DATABASE, NWI_TABLE);' }

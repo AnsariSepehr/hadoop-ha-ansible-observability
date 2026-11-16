@@ -1,0 +1,7 @@
+---
+# include with: yarn_unit=resourcemanager|nodemanager|historyserver
+- name: "Start {{ yarn_unit }}"
+  ansible.builtin.include_tasks: service.yml
+  vars:
+    svc: "{{ yarn_unit }}"
+    svc_port: "{{ {'resourcemanager': yarn_rm_webapp_port, 'nodemanager': yarn_nm_webapp_port, 'historyserver': mapred_history_webapp_port}[yarn_unit] }}"

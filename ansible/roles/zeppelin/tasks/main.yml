@@ -1,0 +1,218 @@
+---
+# Install Apache Zeppelin from offline_packages, configure it, run it under systemd.
+
+# 1. Prerequisites ---------------------------------------------------------------
+- name: Check the configured JAVA_HOME has a java binary
+  ansible.builtin.stat:
+    path: "{{ zeppelin_java_home }}/bin/java"
+  register: zeppelin_java_stat
+  when: zeppelin_java_home | length > 0
+
+- name: Fail if zeppelin_java_home is wrong
+  ansible.builtin.fail:
+    msg: "zeppelin_java_home={{ zeppelin_java_home }} has no bin/java on {{ inventory_hostname }}. Install Java first (offline_packages/java) or fix the variable."
+  when: zeppelin_java_home | length > 0 and not zeppelin_java_stat.stat.exists
+
+- name: Check that some java is on PATH (auto-detect mode)
+  ansible.builtin.command: which java
+  register: zeppelin_which_java
+  changed_when: false
+  failed_when: false
+  when: zeppelin_java_home | length == 0
+
+- name: Fail if no java can be found
+  ansible.builtin.fail:
+    msg: "No java on PATH of {{ inventory_hostname }}. Install a JDK 11+ first (offline_packages/java) or set zeppelin_java_home."
+  when: zeppelin_java_home | length == 0 and zeppelin_which_java.rc != 0
+
+- name: Create zeppelin group
+  ansible.builtin.group:
+    name: "{{ zeppelin_group }}"
+    system: true
+    state: present
+
+- name: Create zeppelin system user
+  ansible.builtin.user:
+    name: "{{ zeppelin_user }}"
+    group: "{{ zeppelin_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ zeppelin_home }}"
+    create_home: false
+    state: present
+
+# 2. Extract the offline tarball ---------------------------------------------------
+- name: Check if Zeppelin is already extracted
+  ansible.builtin.stat:
+    path: "{{ zeppelin_home }}/bin/zeppelin.sh"
+  register: zeppelin_installed
+
+- name: Check the offline tarball exists on the control machine
+  ansible.builtin.stat:
+    path: "{{ zeppelin_tarball_src }}"
+  register: zeppelin_tarball_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not zeppelin_installed.stat.exists
+
+- name: Fail with a clear message if the tarball is missing
+  ansible.builtin.fail:
+    msg: >-
+      Offline package not found: {{ zeppelin_tarball_src }}.
+      Put {{ zeppelin_tarball_name }} into offline_packages/zeppelin/zeppelin-{{ zeppelin_version }}/
+  when: not zeppelin_installed.stat.exists and not zeppelin_tarball_stat.stat.exists
+
+- name: Extract Zeppelin into {{ zeppelin_install_root }}
+  ansible.builtin.unarchive:
+    src: "{{ zeppelin_tarball_src }}"
+    dest: "{{ zeppelin_install_root }}"
+    owner: "{{ zeppelin_user }}"
+    group: "{{ zeppelin_group }}"
+    creates: "{{ zeppelin_home }}/bin/zeppelin.sh"
+
+- name: Create stable {{ zeppelin_symlink }} symlink to the versioned install
+  ansible.builtin.file:
+    src: "{{ zeppelin_home }}"
+    dest: "{{ zeppelin_symlink }}"
+    state: link
+    force: true
+
+- name: Ensure runtime directories exist and belong to the zeppelin user
+  ansible.builtin.file:
+    path: "{{ zeppelin_home }}/{{ item }}"
+    state: directory
+    owner: "{{ zeppelin_user }}"
+    group: "{{ zeppelin_group }}"
+    mode: "0755"
+  loop: [logs, run, notebook, conf]
+
+# 3. JMX exporter (jar from offline_packages/monitoring) ----------------------------
+- name: Create the JMX exporter directory
+  ansible.builtin.file:
+    path: "{{ zeppelin_jmx_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check the JMX exporter jar exists on the control machine
+  ansible.builtin.stat:
+    path: "{{ zeppelin_jmx_jar_src }}"
+  register: zeppelin_jmx_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fail if the JMX exporter jar is missing from offline_packages
+  ansible.builtin.fail:
+    msg: "Missing {{ zeppelin_jmx_jar_src }}"
+  when: not zeppelin_jmx_stat.stat.exists
+
+- name: Copy jmx_prometheus_javaagent.jar
+  ansible.builtin.copy:
+    src: "{{ zeppelin_jmx_jar_src }}"
+    dest: "{{ zeppelin_jmx_jar }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart zeppelin
+
+- name: Deploy catch-all JMX exporter config for Zeppelin
+  ansible.builtin.template:
+    src: zeppelin-jmx.yml.j2
+    dest: "{{ zeppelin_jmx_dir }}/zeppelin-jmx.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart zeppelin
+
+# 4. Zeppelin configuration --------------------------------------------------------------
+- name: Deploy zeppelin-env.sh (port, memory, JMX javaagent)
+  ansible.builtin.template:
+    src: zeppelin-env.sh.j2
+    dest: "{{ zeppelin_home }}/conf/zeppelin-env.sh"
+    owner: "{{ zeppelin_user }}"
+    group: "{{ zeppelin_group }}"
+    mode: "0755"
+  notify: restart zeppelin
+
+# 5. systemd service ---------------------------------------------------------------------
+- name: Deploy the zeppelin systemd unit
+  ansible.builtin.template:
+    src: zeppelin.service.j2
+    dest: "/etc/systemd/system/{{ zeppelin_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd and restart zeppelin
+
+- name: Apply pending handlers before starting
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the zeppelin service
+  ansible.builtin.systemd:
+    name: "{{ zeppelin_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# 6. Verify -----------------------------------------------------------------------------------
+- name: Wait for the Zeppelin web port
+  ansible.builtin.wait_for:
+    port: "{{ zeppelin_port }}"
+    host: 127.0.0.1
+    timeout: 180
+
+- name: Open firewall ports for the web UI and Prometheus scraping
+  ansible.builtin.include_tasks: firewall.yml
+  when: zeppelin_manage_firewall | bool
+
+- name: Wait for the JMX exporter port
+  ansible.builtin.wait_for:
+    port: "{{ zeppelin_jmx_port }}"
+    host: 127.0.0.1
+    timeout: 120
+  register: zeppelin_jmx_wait
+  failed_when: false
+
+- name: Check the JMX exporter really serves metrics
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ zeppelin_jmx_port }}/metrics"
+    return_content: true
+  register: zeppelin_jmx_metrics
+  until: zeppelin_jmx_metrics.status | default(0) == 200
+  retries: 6
+  delay: 5
+  failed_when: false
+  changed_when: false
+
+- name: Collect diagnostics if JMX is not answering
+  ansible.builtin.shell: |
+    echo "--- listening on {{ zeppelin_jmx_port }}:"; ss -ltnp 2>/dev/null | grep ':{{ zeppelin_jmx_port }} ' || echo none
+    echo "--- javaagent in the running JVM:"; pgrep -af 'ZeppelinServer' | grep -o 'javaagent:[^ ]*' || echo "NOT in command line"
+    echo "--- jar and config:"; ls -l '{{ zeppelin_jmx_jar }}' '{{ zeppelin_jmx_dir }}/zeppelin-jmx.yml'
+    echo "--- last service log lines:"; journalctl -u {{ zeppelin_service_name }} -n 25 --no-pager 2>&1
+  register: zeppelin_jmx_diag
+  changed_when: false
+  failed_when: false
+  when: zeppelin_jmx_metrics.status | default(0) != 200
+
+- name: Show diagnostics and fail
+  ansible.builtin.fail:
+    msg: "JMX exporter is not reachable on 127.0.0.1:{{ zeppelin_jmx_port }}.\n{{ zeppelin_jmx_diag.stdout }}\n{{ zeppelin_jmx_diag.stderr | default('') }}"
+  when: zeppelin_jmx_metrics.status | default(0) != 200
+
+- name: Zeppelin REST API answers
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ zeppelin_port }}/api/version"
+    return_content: true
+  register: zeppelin_api
+  until: zeppelin_api.status == 200
+  retries: 12
+  delay: 5
+  changed_when: false
+
+- name: Show Zeppelin version
+  ansible.builtin.debug:
+    msg: "Zeppelin {{ (zeppelin_api.content | from_json).body.version }} is up on http://{{ ansible_host | default(inventory_hostname) }}:{{ zeppelin_port }} (JMX metrics http://{{ ansible_host | default(inventory_hostname) }}:{{ zeppelin_jmx_port }}/metrics)"

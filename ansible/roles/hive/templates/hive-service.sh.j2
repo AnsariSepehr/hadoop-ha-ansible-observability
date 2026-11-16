@@ -1,0 +1,21 @@
+#!/bin/bash
+# {{ ansible_managed }}
+set -e
+export JAVA_HOME="{{ hive_java_home }}"
+export HADOOP_HOME="{{ hadoop_home }}"
+export HADOOP_CONF_DIR="{{ hadoop_conf_dir }}"
+export HIVE_HOME="{{ hive_home }}"
+export HIVE_CONF_DIR="{{ hive_conf_dir }}"
+
+HADOOP_CLASSPATH="$("$HADOOP_HOME/bin/hadoop" classpath)"
+JMX_OPTS=""
+{% if jmx_exporter_enabled | bool %}
+JMX_OPTS="-javaagent:{{ jmx_dir }}/{{ jmx_jar }}={{ jmx_ports[item.jmx] }}:{{ jmx_config }}"
+{% endif %}
+
+exec "$JAVA_HOME/bin/java" $JMX_OPTS \
+  -Xmx{{ hive_heap_mb }}m \
+  -Dhive.log.dir={{ hive_log_dir }} -Dhive.log.file={{ item.log }} \
+  -Dlog4j2.formatMsgNoLookups=true \
+  -cp "$HIVE_HOME/lib/*:$HADOOP_CLASSPATH" \
+  {{ item.class }} "$@"

@@ -1,0 +1,33 @@
+---
+- name: Check the JDK package exists on the control node
+  ansible.builtin.stat:
+    path: "{{ java_cfg.package }}"
+  delegate_to: localhost
+  become: false
+  register: java_pkg
+
+- name: Fail with a clear message if the package is missing
+  ansible.builtin.fail:
+    msg: "Java {{ java_version }} package not found: {{ java_cfg.package }}"
+  when: not java_pkg.stat.exists
+
+- name: Create the versioned install directory
+  ansible.builtin.file:
+    path: "{{ install_root }}/{{ java_cfg.dir_name }}"
+    state: directory
+    mode: "0755"
+
+- name: Extract JDK (top-level directory stripped)
+  ansible.builtin.unarchive:
+    src: "{{ java_cfg.package }}"
+    dest: "{{ install_root }}/{{ java_cfg.dir_name }}"
+    extra_opts: ["--strip-components=1"]
+    owner: root
+    group: root
+
+- name: Point the stable link at this version
+  ansible.builtin.file:
+    src: "{{ install_root }}/{{ java_cfg.dir_name }}"
+    dest: "{{ java_cfg.home }}"
+    state: link
+    force: true

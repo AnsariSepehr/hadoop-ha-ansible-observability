@@ -1,0 +1,6 @@
+---
+- name: Stop the zeppelin service
+  ansible.builtin.systemd:
+    name: "{{ zeppelin_service_name }}"
+    state: stopped
+  failed_when: false

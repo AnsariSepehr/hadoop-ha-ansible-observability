@@ -1,0 +1,48 @@
+---
+- name: "hadoop-{{ item.name }} - is it already healthy?"
+  when: (svc_state | default('started')) != 'stopped'
+  vars:
+    hadoop_port: "{{ {
+      'namenode': hdfs_nn_rpc_port,
+      'datanode': hdfs_dn_data_port,
+      'journalnode': hdfs_jn_rpc_port,
+      'zkfc': hdfs_zkfc_rpc_port,
+      'resourcemanager': yarn_rm_webapp_port,
+      'nodemanager': yarn_nm_webapp_port,
+      'historyserver': mapred_history_webapp_port
+    }[item.name] | default('') }}"
+  ansible.builtin.shell: |
+    set +e
+    state=$(systemctl is-active hadoop-{{ item.name }} 2>/dev/null | tr -d '\n')
+    # Standby NameNodes do not bind the client RPC port.
+    if [ "{{ item.name }}" = "namenode" ] && [ "$state" = "active" ]; then
+      echo healthy
+      exit 0
+    fi
+    if [ -n "{{ hadoop_port }}" ]; then
+      port_ok=$(ss -lnt "sport = :{{ hadoop_port }}" 2>/dev/null | grep -c LISTEN)
+    else
+      port_ok=1
+    fi
+    if [ "$state" = "active" ] && [ "$port_ok" -ge 1 ]; then
+      echo healthy
+    else
+      echo needs-reset
+    fi
+  register: hadoop_health
+  changed_when: false
+
+- name: "hadoop-{{ item.name }} - hard reset and restart"
+  when: (hadoop_health.stdout | default('needs-reset')) != 'healthy'
+  ansible.builtin.include_tasks: service.yml
+  vars:
+    svc: "{{ item.name }}"
+    svc_port: "{{ {
+      'namenode': hdfs_nn_rpc_port,
+      'datanode': hdfs_dn_data_port,
+      'journalnode': hdfs_jn_rpc_port,
+      'zkfc': hdfs_zkfc_rpc_port,
+      'resourcemanager': yarn_rm_webapp_port,
+      'nodemanager': yarn_nm_webapp_port,
+      'historyserver': mapred_history_webapp_port
+    }[item.name] | default(omit) }}"

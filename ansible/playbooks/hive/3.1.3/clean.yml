@@ -1,0 +1,32 @@
+---
+- name: Remove Hive (binaries and units only; MySQL metastore DB is kept)
+  hosts: hive_servers
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "Add -e confirm_destroy_data=yes"
+
+    - ansible.builtin.systemd: { name: "{{ item }}", state: stopped, enabled: false }
+      loop: [hive-server2, hive-metastore]
+      failed_when: false
+
+    - name: Kill Hive JVMs
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kill_java
+      vars:
+        kill_java_label: "hive"
+        kill_java_patterns:
+          - 'org[.]apache[.]hadoop[.]hive[.]metastore[.]HiveMetaStore'
+          - 'org[.]apache[.]hive[.]service[.]server[.]HiveServer2'
+
+    - ansible.builtin.file: { path: "{{ item }}", state: absent }
+      loop:
+        - /etc/systemd/system/hive-server2.service
+        - /etc/systemd/system/hive-metastore.service
+        - /etc/profile.d/hive.sh
+        - "{{ hive_home }}"
+        - "{{ install_root }}/hive-{{ hive_version }}"
+        - "{{ hive_scratch_dir }}"
+
+    - ansible.builtin.systemd: { daemon_reload: true }

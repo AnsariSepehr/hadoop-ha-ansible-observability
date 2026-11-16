@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+  <property><name>javax.jdo.option.ConnectionDriverName</name><value>com.mysql.cj.jdbc.Driver</value></property>
+  <property><name>javax.jdo.option.ConnectionURL</name><value>jdbc:mysql://{{ hive_db_host }}:{{ mysql_port }}/{{ hive_metastore_db }}?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC</value></property>
+  <property><name>javax.jdo.option.ConnectionUserName</name><value>{{ mysql_hive_user }}</value></property>
+  <property><name>javax.jdo.option.ConnectionPassword</name><value>{{ mysql_hive_password }}</value></property>
+  <property><name>hive.metastore.warehouse.dir</name><value>/user/hive/warehouse</value></property>
+  <property><name>hive.metastore.uris</name><value>{{ hive_metastore_uris }}</value></property>
+  <property><name>hive.server2.thrift.bind.host</name><value>0.0.0.0</value></property>
+  <property><name>hive.server2.thrift.port</name><value>{{ hive_server2_port }}</value></property>
+  <property><name>hive.server2.authentication</name><value>NONE</value></property>
+  <property><name>hive.metastore.schema.verification</name><value>false</value></property>
+  <property><name>hive.metastore.event.db.notification.api.auth</name><value>false</value></property>
+  <property><name>datanucleus.connectionPoolingType</name><value>BONECP</value></property>
+  <property><name>datanucleus.schema.autoCreateAll</name><value>false</value></property>
+  <property><name>hive.exec.scratchdir</name><value>{{ hive_scratch_dir }}</value></property>
+  <property><name>hive.exec.local.scratchdir</name><value>{{ hive_local_scratch_dir }}</value></property>
+</configuration>

@@ -1,0 +1,84 @@
+---
+# Test fixture: same topology as production.yml but every node is the local machine,
+# so templates can be rendered and playbooks syntax-checked without any servers.
+#   ansible-playbook -i inventory/local-test.yml tests/render-templates.yml -e allow_default_secrets=true
+all:
+  hosts:
+    localhost: {ansible_connection: local, ansible_python_interpreter: '{{ ansible_playbook_python
+        }}'}
+    node1: {ansible_host: 192.0.2.11}
+    node2: {ansible_host: 192.0.2.12}
+    node3: {ansible_host: 192.0.2.13}
+    node4: {ansible_host: 192.0.2.14}
+    node5: {ansible_host: 192.0.2.15}
+  children:
+    namenodes:
+      hosts:
+        node1: {}
+        node2: {}
+    journalnodes:
+      hosts:
+        node1: {}
+        node2: {}
+        node3: {}
+    zookeepers:
+      hosts:
+        node1: {}
+        node2: {}
+        node3: {}
+    datanodes:
+      hosts:
+        node1: {}
+        node2: {}
+        node3: {}
+        node4: {}
+        node5: {}
+    nodemanagers:
+      hosts:
+        node1: {}
+        node2: {}
+        node3: {}
+        node4: {}
+        node5: {}
+    resourcemanagers:
+      hosts:
+        node1: {}
+        node2: {}
+    history_servers:
+      hosts:
+        node1: {}
+    mysql:
+      hosts:
+        node3: {}
+        node4: {}
+        node5: {}
+    hive_servers:
+      hosts:
+        node1: {}
+    spark_clients:
+      hosts:
+        node1: {}
+        node2: {}
+    spark_history_servers:
+      hosts:
+        node1: {}
+    kafka_brokers:
+      hosts:
+        node1: {}
+        node2: {}
+        node3: {}
+    cluster:
+      children:
+        namenodes: {}
+        journalnodes: {}
+        zookeepers: {}
+        datanodes: {}
+        nodemanagers: {}
+        resourcemanagers: {}
+        history_servers: {}
+        mysql: {}
+        hive_servers: {}
+        spark_clients: {}
+        spark_history_servers: {}
+        kafka_brokers: {}
+  vars: {ansible_connection: local}

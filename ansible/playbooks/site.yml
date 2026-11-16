@@ -1,0 +1,49 @@
+---
+# Full installation, one tagged stage per line (in install order).
+#
+#   Run only some stages :  ansible-playbook playbooks/site.yml --tags hive,spark
+#   Skip some stages     :  ansible-playbook playbooks/site.yml --skip-tags preflight,zookeeper
+#   Start from a stage   :  scripts/cluster.sh install --from hive      (skips every stage before it)
+#   List the stages      :  scripts/cluster.sh install --list-stages
+#
+# Every stage has its own unique tag (first one below) and may also belong to a group tag:
+#   hadoop = hadoop_install + hadoop_ssl + hadoop_ha + yarn          system = initialize
+# The stages are independent (each one that needs generated IDs creates them itself),
+# so any subset can be run, provided the services it depends on are already installed.
+# If you change the order here, change STAGES in scripts/cluster.sh too.
+
+- ansible.builtin.import_playbook: system/preflight.yml
+  tags: [preflight]
+
+- ansible.builtin.import_playbook: system/initialize.yml
+  tags: [initialize, system]
+
+- ansible.builtin.import_playbook: monitoring/jmx-exporter/1.1.0/install.yml
+  tags: [jmx]
+
+- ansible.builtin.import_playbook: zookeeper/3.8.4/install.yml
+  tags: [zookeeper]
+
+- ansible.builtin.import_playbook: hadoop/3.3.6/install.yml
+  tags: [hadoop_install, hadoop]
+
+- ansible.builtin.import_playbook: hadoop/3.3.6/ssl.yml
+  tags: [hadoop_ssl, hadoop]
+
+- ansible.builtin.import_playbook: hadoop/3.3.6/bootstrap-ha.yml
+  tags: [hadoop_ha, hadoop]
+
+- ansible.builtin.import_playbook: hadoop/3.3.6/yarn.yml
+  tags: [yarn, hadoop]
+
+- ansible.builtin.import_playbook: mysql/8.0.42/install.yml
+  tags: [mysql]
+
+- ansible.builtin.import_playbook: hive/3.1.3/install.yml
+  tags: [hive]
+
+- ansible.builtin.import_playbook: spark/3.5.4/install.yml
+  tags: [spark]
+
+- ansible.builtin.import_playbook: kafka/4.0.0/install.yml
+  tags: [kafka]

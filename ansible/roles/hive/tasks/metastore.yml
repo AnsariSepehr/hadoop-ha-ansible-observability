@@ -1,0 +1,177 @@
+---
+- name: hive-site.xml
+  ansible.builtin.template:
+    src: hive-site.xml.j2
+    dest: "{{ hive_conf_dir }}/hive-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0640"
+  notify: Restart hive services
+
+- name: Database and account on the MySQL primary
+  when: groups.get('mysql', []) | length > 0
+  delegate_to: "{{ hostvars[groups['mysql'][0]].mysql_primary_host }}"
+  run_once: true
+  block:
+    - name: Create the metastore database
+      ansible.builtin.command:
+        argv: [mysql, -e, "CREATE DATABASE IF NOT EXISTS {{ hive_metastore_db }} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"]
+      changed_when: false
+
+    - name: Create the Hive account for every Hive host
+      ansible.builtin.command:
+        argv:
+          - mysql
+          - -e
+          - >-
+            CREATE USER IF NOT EXISTS '{{ mysql_hive_user }}'@'{{ hostvars[item].ansible_host | default(item) }}'
+            IDENTIFIED WITH mysql_native_password BY '{{ mysql_hive_password }}';
+            ALTER USER '{{ mysql_hive_user }}'@'{{ hostvars[item].ansible_host | default(item) }}'
+            IDENTIFIED WITH mysql_native_password BY '{{ mysql_hive_password }}';
+            GRANT ALL PRIVILEGES ON {{ hive_metastore_db }}.* TO '{{ mysql_hive_user }}'@'{{ hostvars[item].ansible_host | default(item) }}';
+            GRANT SESSION_VARIABLES_ADMIN ON *.* TO '{{ mysql_hive_user }}'@'{{ hostvars[item].ansible_host | default(item) }}';
+      loop: "{{ groups['hive_servers'] }}"
+      no_log: true
+      changed_when: false
+
+- name: Schema initialisation (first Hive host only)
+  when: inventory_hostname == hive_first_host
+  block:
+    - name: Does the schema already exist?
+      ansible.builtin.command: "{{ hive_home }}/bin/schematool -dbType mysql -info"
+      environment: "{{ hive_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: hive_schema_info
+      failed_when: false
+      changed_when: false
+
+    - name: Drop partial metastore DB (schematool -info failed)
+      when:
+        - hive_schema_info.rc | default(1) | int != 0
+        - groups.get('mysql', []) | length > 0
+      delegate_to: "{{ hostvars[groups['mysql'][0]].mysql_primary_host }}"
+      ansible.builtin.command:
+        argv: [mysql, -e, "DROP DATABASE IF EXISTS {{ hive_metastore_db }}; CREATE DATABASE {{ hive_metastore_db }} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"]
+      changed_when: true
+
+    # ------------------------------------------------------------------
+    # Build a correct schema file: statements always end with ';' at
+    # end-of-line (what Beeline needs), and the GR_PK_PATCH marker is
+    # a leading comment before the ALTER, not a trailing one.
+    # ------------------------------------------------------------------
+    - name: Extract, normalise and patch the schema on the control node
+      when: hive_schema_info.rc | default(1) | int != 0
+      delegate_to: localhost
+      become: false
+      ansible.builtin.shell: |
+        set -e
+        OUT="{{ generated_dir }}/hive-schema-patched.sql"
+        mkdir -p "{{ generated_dir }}"
+        rm -f "$OUT"
+
+        TMP=$(mktemp -d)
+        tar -xzf "{{ hive_package }}" -C "$TMP" --strip-components=5 \
+          "apache-hive-{{ hive_version }}-bin/scripts/metastore/upgrade/mysql/hive-schema-{{ hive_schema_version }}.mysql.sql"
+
+        python3 - "$TMP/hive-schema-{{ hive_schema_version }}.mysql.sql" "$OUT" <<'PYEOF'
+        import sys, re
+        src, dst = sys.argv[1], sys.argv[2]
+        with open(src, "rb") as f:
+            s = f.read().decode("utf-8", errors="replace")
+
+        # 1. Normalise line endings
+        s = s.replace("\r\n", "\n").replace("\r", "\n")
+
+        # 2. Ensure every ';' is followed by a newline
+        s = re.sub(r";(?=\S)", ";\n", s)
+
+        # 3. Remove any previously inserted patches
+        s = re.sub(r"/\* GR_PK_PATCH_[A-Z_]+ \*/\s*", "", s)
+        s = re.sub(r"\n[ \t]*ALTER TABLE [A-Z_]+ ADD PRIMARY KEY[^;]*;[ \t]*\n", "\n", s)
+
+        # 4. Insert patches with the marker BEFORE the ALTER on the same
+        #    line, so the line ENDS with ';' (this is what Beeline needs).
+        patches = [
+          ("INSERT INTO NEXT_TXN_ID VALUES(1);",
+           "/* GR_PK_PATCH_NEXT_TXN_ID */ ALTER TABLE NEXT_TXN_ID ADD PRIMARY KEY (NTXN_NEXT);\n",
+           "before"),
+          ("INSERT INTO NEXT_COMPACTION_QUEUE_ID VALUES(1);",
+           "/* GR_PK_PATCH_NEXT_COMPACTION_QUEUE_ID */ ALTER TABLE NEXT_COMPACTION_QUEUE_ID ADD PRIMARY KEY (NCQ_NEXT);\n",
+           "before"),
+          ("INSERT INTO NEXT_LOCK_ID VALUES(1);",
+           "/* GR_PK_PATCH_NEXT_LOCK_ID */ ALTER TABLE NEXT_LOCK_ID ADD PRIMARY KEY (NL_NEXT);\n",
+           "before"),
+          ("CREATE INDEX TC_TXNID_INDEX ON TXN_COMPONENTS (TC_TXNID);",
+           "\n/* GR_PK_PATCH_TXN_COMPONENTS */ ALTER TABLE TXN_COMPONENTS ADD PRIMARY KEY (TC_TXNID, TC_DATABASE, TC_TABLE, TC_PARTITION);\n",
+           "after"),
+          ("CREATE INDEX COMPLETED_TXN_COMPONENTS_IDX ON COMPLETED_TXN_COMPONENTS (CTC_DATABASE, CTC_TABLE, CTC_PARTITION) USING BTREE;",
+           "\n/* GR_PK_PATCH_COMPLETED_TXN_COMPONENTS */ ALTER TABLE COMPLETED_TXN_COMPONENTS ADD PRIMARY KEY (CTC_TXNID, CTC_DATABASE, CTC_TABLE, CTC_PARTITION);\n",
+           "after"),
+          ("CREATE UNIQUE INDEX NEXT_WRITE_ID_IDX ON NEXT_WRITE_ID (NWI_DATABASE, NWI_TABLE);",
+           "\n/* GR_PK_PATCH_NEXT_WRITE_ID */ ALTER TABLE NEXT_WRITE_ID ADD PRIMARY KEY (NWI_DATABASE, NWI_TABLE);\n",
+           "after"),
+        ]
+        for search, insert, mode in patches:
+            idx = s.find(search)
+            if idx < 0:
+                print("MISSING:", search[:50], file=sys.stderr)
+                sys.exit(2)
+            pos = idx if mode == "before" else idx + len(search)
+            s = s[:pos] + insert + s[pos:]
+
+        with open(dst, "w") as f:
+            f.write(s)
+        print("built:", dst)
+        PYEOF
+
+        rm -rf "$TMP"
+        echo "built"
+      register: hive_schema_build
+      failed_when: "'built' not in hive_schema_build.stdout"
+
+    - name: Install the patched schema on the Hive host
+      when: hive_schema_info.rc | default(1) | int != 0
+      ansible.builtin.copy:
+        src: "{{ generated_dir }}/hive-schema-patched.sql"
+        dest: "{{ hive_schema_sql }}"
+        owner: "{{ hadoop_user }}"
+        group: "{{ hadoop_group }}"
+        mode: "0644"
+
+    - name: Sanity check — no merged statements remain
+      when: hive_schema_info.rc | default(1) | int != 0
+      ansible.builtin.shell: |
+        set -e
+        # must be zero — a semicolon must never be followed by a letter on the same line
+        BAD=$(grep -cE ';[A-Za-z]' "{{ hive_schema_sql }}" || true)
+        echo "merged_lines=$BAD"
+        test "$BAD" = "0"
+      register: hive_schema_check
+      changed_when: false
+
+    - name: Sanity check — every ALTER patch line ends with ';'
+      when: hive_schema_info.rc | default(1) | int != 0
+      ansible.builtin.shell: |
+        set -e
+        BAD=$(grep 'GR_PK_PATCH' "{{ hive_schema_sql }}" | grep -vc ';$' || true)
+        echo "bad_markers=$BAD"
+        test "$BAD" = "0"
+      register: hive_schema_marker_check
+      changed_when: false
+
+    - name: Initialise the metastore schema
+      when: hive_schema_info.rc | default(1) | int != 0
+      ansible.builtin.command: "{{ hive_home }}/bin/schematool -dbType mysql -initSchema -verbose"
+      environment: "{{ hive_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: hive_schema_init
+      changed_when: true
+
+    - name: Verify the schema
+      ansible.builtin.command: "{{ hive_home }}/bin/schematool -dbType mysql -info"
+      environment: "{{ hive_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      changed_when: false

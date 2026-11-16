@@ -1,0 +1,9 @@
+---
+- name: Count leaders in the ensemble
+  ansible.builtin.assert:
+    that:
+      - (ansible_play_hosts | map('extract', hostvars, ['zk_status', 'stdout']) | map('trim') | select('equalto', 'leader') | list | length) == 1
+      - (ansible_play_hosts | map('extract', hostvars, ['zk_status', 'stdout']) | map('trim') | reject('in', ['leader', 'follower', 'observer']) | list | length) == 0
+    fail_msg: "The ensemble is not healthy: expected exactly one leader and only leader/follower/observer roles on all nodes."
+    success_msg: "ZooKeeper ensemble is healthy (1 leader)."
+  run_once: true

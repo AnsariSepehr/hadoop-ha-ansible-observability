@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+  <property><name>mapreduce.framework.name</name><value>yarn</value></property>
+{% if history_server_addr %}
+  <property><name>mapreduce.jobhistory.address</name><value>{{ history_server_addr }}:{{ mapred_history_port }}</value></property>
+  <property><name>mapreduce.jobhistory.webapp.address</name><value>{{ history_server_addr }}:{{ mapred_history_webapp_port }}</value></property>
+{% endif %}
+  <property><name>mapreduce.jobhistory.intermediate-done-dir</name><value>/user/history/tmp</value></property>
+  <property><name>mapreduce.jobhistory.done-dir</name><value>/user/history/done</value></property>
+  <property><name>mapreduce.map.memory.mb</name><value>{{ mapreduce_task_mb }}</value></property>
+  <property><name>mapreduce.reduce.memory.mb</name><value>{{ mapreduce_task_mb }}</value></property>
+  <property><name>mapreduce.map.java.opts</name><value>-Xmx{{ mapreduce_task_heap_mb }}m</value></property>
+  <property><name>mapreduce.reduce.java.opts</name><value>-Xmx{{ mapreduce_task_heap_mb }}m</value></property>
+  <property><name>yarn.app.mapreduce.am.env</name><value>HADOOP_MAPRED_HOME={{ hadoop_home }}</value></property>
+  <property><name>mapreduce.map.env</name><value>HADOOP_MAPRED_HOME={{ hadoop_home }}</value></property>
+  <property><name>mapreduce.reduce.env</name><value>HADOOP_MAPRED_HOME={{ hadoop_home }}</value></property>
+  <property><name>mapreduce.application.classpath</name><value>{{ hadoop_home }}/share/hadoop/mapreduce/*,{{ hadoop_home }}/share/hadoop/mapreduce/lib/*</value></property>
+</configuration>

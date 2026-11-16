@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[client]
+socket={{ mysql_socket }}
+
+[mysqld]
+port={{ mysql_port }}
+datadir={{ mysql_data_dir }}
+socket={{ mysql_socket }}
+log-error={{ mysql_error_log }}
+pid-file=/var/run/mysqld/mysqld.pid
+bind-address=0.0.0.0
+report_host={{ node_addr }}
+max_connections={{ mysql_max_connections }}
+innodb_buffer_pool_size={{ mysql_buffer_pool_size }}
+
+!includedir /etc/my.cnf.d

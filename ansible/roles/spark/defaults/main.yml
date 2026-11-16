@@ -1,0 +1,16 @@
+---
+spark_user: "{{ hadoop_user }}"
+spark_group: "{{ hadoop_group }}"
+spark_event_log_dir: "hdfs:///spark-logs"
+spark_integrate_hive: "{{ groups.get('hive_servers', []) | length > 0 }}"
+spark_yarn_archive_hdfs_dir: /spark-jars
+spark_yarn_replication: "{{ [3, groups.get('datanodes', []) | length] | min }}"
+spark_run_smoke_tests: true
+
+spark_env:
+  JAVA_HOME: "{{ spark_java_home }}"
+  HADOOP_HOME: "{{ hadoop_home }}"
+  HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"
+  YARN_CONF_DIR: "{{ hadoop_conf_dir }}"
+  SPARK_HOME: "{{ spark_home }}"
+  HOME: "{{ hadoop_user_home }}"

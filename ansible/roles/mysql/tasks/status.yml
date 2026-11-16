@@ -1,0 +1,11 @@
+---
+- name: Group membership
+  ansible.builtin.command: >-
+    mysql -e "SELECT MEMBER_HOST, MEMBER_PORT, MEMBER_STATE, MEMBER_ROLE FROM performance_schema.replication_group_members"
+  register: gr_members
+  changed_when: false
+
+- name: Show membership
+  ansible.builtin.debug:
+    var: gr_members.stdout_lines
+  run_once: true

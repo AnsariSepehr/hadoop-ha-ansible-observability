@@ -1,0 +1,12 @@
+.generated/
+*.retry
+offline_packages/**/*
+!offline_packages/**/.gitkeep
+!offline_packages/README.md
+!offline_packages/MANIFEST.md
+inventory/group_vars/all/secrets.yml
+.vault_pass*
+*.key
+*.pem
+*.jks
+*.p12

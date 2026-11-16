@@ -1,0 +1,31 @@
+---
+- name: Start and enable ZooKeeper
+  ansible.builtin.systemd:
+    name: zookeeper
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for ZooKeeper client port to accept connections
+  ansible.builtin.wait_for:
+    host: "{{ node_addr }}"
+    port: "{{ zookeeper_client_port }}"
+    timeout: 90
+
+- name: Query the quorum role via the 4-letter 'stat' command
+  ansible.builtin.shell: |
+    set -o pipefail
+    exec 3<>/dev/tcp/127.0.0.1/{{ zookeeper_client_port }}
+    printf "stat" >&3
+    cat <&3 | sed -n 's/^Mode:[[:space:]]*//p'
+    exec 3<&-
+    exec 3>&-
+  register: zk_status
+  retries: 12
+  delay: 5
+  until: zk_status.stdout | trim | length > 0
+  changed_when: false
+
+- name: Show role
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: Mode: {{ zk_status.stdout | trim }}"

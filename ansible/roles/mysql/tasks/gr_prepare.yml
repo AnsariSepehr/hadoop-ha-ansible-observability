@@ -1,0 +1,45 @@
+---
+# Group Replication prerequisites that live outside MySQL itself.
+#
+# On an SELinux-enforcing host (Rocky/RHEL) mysqld_t may only bind to / connect to ports labelled
+# mysqld_port_t. The stock policy labels 3306 but NOT the Group Replication (XCom) port, so
+#   START GROUP_REPLICATION  ->  ERROR 3092 "not configured properly to be an active member"
+#   mysqld.log               ->  "[GCS] Unable to announce tcp port 33061"
+# See the MySQL manual: "Setting the TCP Port Context for Group Replication".
+
+- name: SELinux mode on this node
+  ansible.builtin.command: getenforce
+  register: gr_selinux_mode
+  changed_when: false
+  failed_when: false
+
+- name: Label the Group Replication port for mysqld
+  when:
+    - gr_selinux_mode.rc == 0
+    - gr_selinux_mode.stdout | trim in ['Enforcing', 'Permissive']
+  block:
+    - name: Is semanage available?
+      ansible.builtin.command: which semanage
+      register: gr_semanage
+      changed_when: false
+      failed_when: false
+
+    - name: Stop with a clear message when semanage is missing
+      ansible.builtin.fail:
+        msg: >-
+          SELinux is {{ gr_selinux_mode.stdout | trim }} on {{ inventory_hostname }} but 'semanage' is not installed.
+          Install policycoreutils-python-utils (add its RPM to the offline repository) or run manually:
+          semanage port -a -t mysqld_port_t -p tcp {{ mysql_gr_port }}
+      when: gr_semanage.rc != 0
+
+    - name: Add tcp/{{ mysql_gr_port }} to mysqld_port_t (idempotent)
+      ansible.builtin.shell: |
+        if semanage port -l | grep -Eq '^mysqld_port_t[[:space:]]+tcp[[:space:]].*(^|[ ,]){{ mysql_gr_port }}(,|$)'; then
+          echo SEPORT_PRESENT
+          exit 0
+        fi
+        semanage port -a -t mysqld_port_t -p tcp {{ mysql_gr_port }} 2>/dev/null \
+          || semanage port -m -t mysqld_port_t -p tcp {{ mysql_gr_port }}
+        echo SEPORT_ADDED
+      register: gr_seport
+      changed_when: "'SEPORT_ADDED' in gr_seport.stdout"

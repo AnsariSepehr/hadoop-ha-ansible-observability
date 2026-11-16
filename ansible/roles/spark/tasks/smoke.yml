@@ -1,0 +1,17 @@
+---
+- name: SparkPi on YARN (cluster mode)
+  ansible.builtin.shell: >-
+    {{ spark_home }}/bin/spark-submit --class org.apache.spark.examples.SparkPi
+    --master yarn --deploy-mode cluster --num-executors 2
+    --driver-memory 1g --executor-memory 1g
+    {{ spark_home }}/examples/jars/spark-examples_*.jar 10 2>&1 | tail -25
+  environment: "{{ spark_env }}"
+  become: true
+  become_user: "{{ spark_user }}"
+  register: spark_pi
+  changed_when: false
+  failed_when: "'SUCCEEDED' not in spark_pi.stdout"
+
+- name: Show tail
+  ansible.builtin.debug:
+    var: spark_pi.stdout_lines

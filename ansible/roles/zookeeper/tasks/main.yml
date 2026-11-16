@@ -1,0 +1,81 @@
+---
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Install ZooKeeper binaries
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: install_tarball
+  vars:
+    pkg_label: zookeeper
+    pkg_src: "{{ zookeeper_package }}"
+    pkg_dir: "{{ install_root }}/zookeeper-{{ zookeeper_version }}"
+    pkg_link: "{{ zookeeper_home }}"
+    pkg_owner: "{{ hadoop_user }}"
+    pkg_group: "{{ hadoop_group }}"
+
+- name: Create data, log and run directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+  loop:
+    - "{{ zookeeper_data_dir }}"
+    - "{{ zookeeper_log_dir }}"
+
+- name: Keep /run/zookeeper across reboots
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/zookeeper.conf
+    mode: "0644"
+    content: "d {{ run_root }}/zookeeper 0755 {{ hadoop_user }} {{ hadoop_group }} -\n"
+  register: zk_tmpfiles
+
+- name: Create /run/zookeeper now
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/zookeeper.conf
+  when: zk_tmpfiles is changed
+  changed_when: true
+
+- name: Write zoo.cfg
+  ansible.builtin.template:
+    src: zoo.cfg.j2
+    dest: "{{ zookeeper_home }}/conf/zoo.cfg"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+  notify: Restart zookeeper
+
+- name: Write myid
+  ansible.builtin.copy:
+    dest: "{{ zookeeper_data_dir }}/myid"
+    content: "{{ zookeeper_myid }}\n"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+
+- name: Write JVM options (java-env.sh)
+  ansible.builtin.template:
+    src: java.env.j2
+    dest: "{{ zookeeper_home }}/conf/java.env"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+  notify: Restart zookeeper
+
+- name: Install systemd unit
+  ansible.builtin.template:
+    src: zookeeper.service.j2
+    dest: /etc/systemd/system/zookeeper.service
+    mode: "0644"
+  notify: Restart zookeeper
+
+- name: Environment for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/zookeeper.sh
+    mode: "0644"
+    content: |
+      export ZOOKEEPER_HOME={{ zookeeper_home }}
+      export PATH=$PATH:$ZOOKEEPER_HOME/bin

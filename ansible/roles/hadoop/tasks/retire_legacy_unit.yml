@@ -1,0 +1,88 @@
+---
+# Retire old unprefixed units without signalling a JVM owned by hadoop-*.
+- name: "Check legacy {{ legacy_unit_name }} unit file"
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ legacy_unit_name }}.service"
+  register: legacy_unit_file
+
+- name: "Inspect legacy {{ legacy_unit_name }} unit process"
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - show
+      - "{{ legacy_unit_name }}.service"
+      - --property=MainPID
+      - --value
+  register: legacy_unit_mainpid
+  changed_when: false
+  failed_when: false
+  when: legacy_unit_file.stat.exists
+
+- name: "Refuse to retire {{ legacy_unit_name }} while it owns a process"
+  ansible.builtin.assert:
+    that:
+      - legacy_unit_mainpid.stdout | trim == "0"
+    fail_msg: >-
+      Refusing to replace {{ legacy_unit_name }}.service because systemd
+      reports MainPID={{ legacy_unit_mainpid.stdout | default('unknown') }}.
+      No service or data was changed. Inspect this legacy unit before retrying.
+  when: legacy_unit_file.stat.exists
+
+# Neutralize ExecStop before stopping the old unit: its old ExecStop could
+# otherwise stop a daemon now owned by the canonical hadoop-* unit.
+- name: "Neutralize legacy {{ legacy_unit_name }} unit before stopping it"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ legacy_unit_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Retired legacy Hadoop unit (temporary safe shutdown)
+      ConditionPathExists=/nonexistent
+
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/true
+      ExecStop=/bin/true
+      RemainAfterExit=no
+      Restart=no
+      KillMode=none
+  when: legacy_unit_file.stat.exists
+  register: legacy_unit_neutralized
+
+- name: Reload systemd after neutralizing legacy unit
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - legacy_unit_file.stat.exists
+    - legacy_unit_neutralized is changed
+
+- name: Stop and disable legacy {{ legacy_unit_name }} unit safely
+  ansible.builtin.systemd:
+    name: "{{ legacy_unit_name }}.service"
+    state: stopped
+    enabled: false
+    daemon_reload: true
+  when: legacy_unit_file.stat.exists
+
+- name: Remove retired legacy {{ legacy_unit_name }} unit file
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ legacy_unit_name }}.service"
+    state: absent
+  when: legacy_unit_file.stat.exists
+
+- name: Reload systemd after removing legacy unit
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: legacy_unit_file.stat.exists
+
+- name: Clear failed state for retired legacy {{ legacy_unit_name }} unit
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - reset-failed
+      - "{{ legacy_unit_name }}.service"
+  changed_when: false
+  failed_when: false
+  when: legacy_unit_file.stat.exists

@@ -1,0 +1,20 @@
+---
+common_sysctl:
+  vm.swappiness: 1
+  net.core.somaxconn: 4096
+  net.ipv4.tcp_keepalive_time: 600
+  fs.file-max: 1048576
+
+# پورت‌های لازم هر گروه (فقط وقتی manage_firewall=true)
+firewall_ports_by_group:
+  zookeepers: ["{{ zookeeper_client_port }}", "{{ zookeeper_peer_port }}", "{{ zookeeper_election_port }}"]
+  journalnodes: ["{{ hdfs_jn_rpc_port }}", "{{ hdfs_jn_http_port }}"]
+  namenodes: ["{{ hdfs_nn_rpc_port }}", "{{ hdfs_nn_http_port }}", "{{ hdfs_nn_https_port }}", "{{ hdfs_zkfc_rpc_port }}"]
+  datanodes: ["{{ hdfs_dn_http_port }}", "{{ hdfs_dn_https_port }}", "{{ hdfs_dn_data_port }}"]
+  resourcemanagers: ["{{ yarn_rm_port }}", "{{ yarn_rm_scheduler_port }}", "{{ yarn_rm_tracker_port }}", "{{ yarn_rm_admin_port }}", "{{ yarn_rm_webapp_port }}"]
+  nodemanagers: ["{{ yarn_nm_rpc_port }}", "{{ yarn_nm_webapp_port }}", "8040", "8044", "13562"]
+  history_servers: ["{{ mapred_history_port }}", "{{ mapred_history_webapp_port }}"]
+  mysql: ["{{ mysql_port }}", "{{ mysql_gr_port }}"]
+  hive_servers: ["{{ hive_metastore_port }}", "{{ hive_server2_port }}"]
+  spark_history_servers: ["{{ spark_history_port }}"]
+  kafka_brokers: ["{{ kafka_broker_port }}", "{{ kafka_controller_port }}"]

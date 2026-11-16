@@ -1,0 +1,26 @@
+---
+# Creates the cluster-wide identifiers once and keeps them in .generated/ so every later run reuses them.
+- name: Generate persistent cluster identifiers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Create the generated directory
+      ansible.builtin.file:
+        path: "{{ generated_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Kafka KRaft cluster id (base64 UUID)
+      ansible.builtin.shell: >-
+        python3 -c "import base64,uuid;print(base64.urlsafe_b64encode(uuid.uuid4().bytes).rstrip(b'=').decode())"
+        > {{ generated_dir }}/kafka_cluster_id
+      args:
+        creates: "{{ generated_dir }}/kafka_cluster_id"
+
+    - name: MySQL Group Replication group name (UUID)
+      ansible.builtin.shell: >-
+        python3 -c "import uuid;print(uuid.uuid4())" > {{ generated_dir }}/mysql_gr_group_name
+      args:
+        creates: "{{ generated_dir }}/mysql_gr_group_name"

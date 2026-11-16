@@ -1,0 +1,32 @@
+---
+- name: Wait until one NameNode becomes active
+  ansible.builtin.shell: |
+    for i in $(seq 1 60); do
+      for id in {{ hdfs_nn_ids | join(' ') }}; do
+        {{ hadoop_home }}/bin/hdfs haadmin -getServiceState $id 2>/dev/null
+      done | grep -qx active && exit 0
+      sleep 5
+    done
+    exit 1
+  environment: "{{ hadoop_env | combine({'HDFS_NAMENODE_OPTS': ''}) }}"
+  register: ha_active_wait
+  changed_when: false
+  retries: 3
+  delay: 10
+  until: ha_active_wait.rc == 0
+
+- name: Report HA state
+  ansible.builtin.shell: |
+    for id in {{ hdfs_nn_ids | join(' ') }}; do
+      echo -n "$id: "
+      {{ hadoop_home }}/bin/hdfs haadmin -getServiceState $id 2>&1 | tail -1
+    done
+    exit 0
+  environment: "{{ hadoop_env }}"
+  register: ha_report
+  changed_when: false
+  failed_when: false
+
+- name: Show HA state
+  ansible.builtin.debug:
+    var: ha_report.stdout_lines

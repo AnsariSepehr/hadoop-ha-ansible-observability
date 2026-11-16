@@ -1,0 +1,98 @@
+---
+# Binaries, wrappers and systemd units (no database access here).
+- name: Require initialised node
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: require
+
+- name: Hadoop must be installed first
+  ansible.builtin.stat:
+    path: "{{ hadoop_home }}/bin/hdfs"
+  register: hive_hadoop
+  failed_when: not hive_hadoop.stat.exists
+
+- name: Install Hive binaries
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: install_tarball
+  vars:
+    pkg_label: hive
+    pkg_src: "{{ hive_package }}"
+    pkg_dir: "{{ install_root }}/hive-{{ hive_version }}"
+    pkg_link: "{{ hive_home }}"
+    pkg_owner: "{{ hadoop_user }}"
+    pkg_group: "{{ hadoop_group }}"
+
+- name: Check the JDBC driver on the control node
+  ansible.builtin.stat:
+    path: "{{ mysql_connector_package }}"
+  delegate_to: localhost
+  become: false
+  register: hive_jdbc_local
+  failed_when: not hive_jdbc_local.stat.exists
+
+- name: Install the MySQL JDBC driver
+  ansible.builtin.copy:
+    src: "{{ mysql_connector_package }}"
+    dest: "{{ hive_home }}/lib/{{ mysql_connector_package | basename }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+
+- name: Align Guava with Hadoop (prevents NoSuchMethodError)
+  ansible.builtin.shell: |
+    set -e
+    G=$(ls {{ hadoop_home }}/share/hadoop/hdfs/lib/guava-*.jar | head -1)
+    rm -f {{ hive_home }}/lib/guava-*.jar
+    cp "$G" {{ hive_home }}/lib/
+    chown {{ hadoop_user }}:{{ hadoop_group }} {{ hive_home }}/lib/$(basename "$G")
+    touch {{ hive_home }}/lib/.guava-aligned
+  args:
+    creates: "{{ hive_home }}/lib/.guava-aligned"
+  when: hive_replace_guava | bool
+
+- name: Log and scratch directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+  loop:
+    - "{{ hive_log_dir }}"
+    - "{{ hive_conf_dir }}"
+    - "{{ hive_local_scratch_dir }}"
+
+- name: Wrapper scripts (java launched directly so the JMX agent works)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ hive_home }}/bin/{{ item.dest }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+  loop:
+    - { src: hive-service.sh.j2, dest: hivemetastore-run.sh, svc: metastore, class: org.apache.hadoop.hive.metastore.HiveMetaStore, log: hive-metastore.log, jmx: hivemetastore }
+    - { src: hive-service.sh.j2, dest: hiveserver2-run.sh, svc: hiveserver2, class: org.apache.hive.service.server.HiveServer2, log: hive-server2.log, jmx: hiveserver2 }
+  notify: Restart hive services
+
+- name: systemd units
+  ansible.builtin.template:
+    src: hive.service.j2
+    dest: "/etc/systemd/system/{{ item.unit }}.service"
+    mode: "0644"
+  loop:
+    - { unit: hive-metastore, desc: Hive Metastore, run: hivemetastore-run.sh, log: hive-metastore.log, requires: "" }
+    - { unit: hive-server2, desc: HiveServer2, run: hiveserver2-run.sh, log: hive-server2.log, requires: hive-metastore.service }
+  notify: Reload systemd (hive)
+
+- name: Environment for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/hive.sh
+    mode: "0644"
+    content: |
+      export HIVE_HOME={{ hive_home }}
+      export HIVE_CONF_DIR={{ hive_conf_dir }}
+      export PATH=$PATH:$HIVE_HOME/bin
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

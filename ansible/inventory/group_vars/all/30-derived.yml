@@ -1,0 +1,73 @@
+---
+# =============================================================================
+#  متغیرهای مشتق‌شده از Inventory – نیازی به ویرایش ندارند
+# =============================================================================
+node_addr: "{{ (ansible_host | default(inventory_hostname)) if address_mode == 'ip' else inventory_hostname }}"
+
+# ---- ZooKeeper ---------------------------------------------------------------------
+zookeeper_connect: "{{ groups.get('zookeepers', []) | map('extract', hostvars, 'node_addr') | map('regex_replace', '$', ':' ~ zookeeper_client_port) | join(',') }}"
+zookeeper_myid: "{{ groups.get('zookeepers', []).index(inventory_hostname) + 1 if inventory_hostname in groups.get('zookeepers', []) else 0 }}"
+
+# ---- HDFS -------------------------------------------------------------------------
+hdfs_nn_id: "nn{{ groups.get('namenodes', []).index(inventory_hostname) + 1 if inventory_hostname in groups.get('namenodes', []) else 0 }}"
+hdfs_first_nn: "{{ groups['namenodes'][0] }}"
+hdfs_journal_uri: "qjournal://{{ groups.get('journalnodes', []) | map('extract', hostvars, 'node_addr') | map('regex_replace', '$', ':' ~ hdfs_jn_rpc_port) | join(';') }}/{{ hdfs_nameservice }}"
+hdfs_nn_ids: "{{ range(1, groups.get('namenodes', []) | length + 1) | map('regex_replace', '^', 'nn') | list }}"
+
+# ---- YARN -------------------------------------------------------------------------
+yarn_rm_ids: "{{ range(1, groups.get('resourcemanagers', []) | length + 1) | map('regex_replace', '^', 'rm') | list }}"
+yarn_rm_ha: "{{ groups.get('resourcemanagers', []) | length > 1 }}"
+yarn_rm_id: "rm{{ groups.get('resourcemanagers', []).index(inventory_hostname) + 1 if inventory_hostname in groups.get('resourcemanagers', []) else 0 }}"
+history_server_addr: "{{ hostvars[groups['history_servers'][0]].node_addr if groups.get('history_servers', []) else '' }}"
+
+# ---- Hive -------------------------------------------------------------------------
+hive_metastore_uris: "{{ groups.get('hive_servers', []) | map('extract', hostvars, 'node_addr') | map('regex_replace', '^', 'thrift://') | map('regex_replace', '$', ':' ~ hive_metastore_port) | join(',') }}"
+hive_first_host: "{{ groups['hive_servers'][0] if groups.get('hive_servers', []) else '' }}"
+
+# ---- MySQL ------------------------------------------------------------------------
+mysql_gr_enabled: "{{ groups.get('mysql', []) | length > 1 }}"
+mysql_server_id: "{{ 100 + groups.get('mysql', []).index(inventory_hostname) + 1 if inventory_hostname in groups.get('mysql', []) else 0 }}"
+mysql_gr_group_name: "{{ lookup('ansible.builtin.file', generated_dir ~ '/mysql_gr_group_name') }}"
+mysql_gr_seeds: "{{ groups.get('mysql', []) | map('extract', hostvars, 'node_addr') | map('regex_replace', '$', ':' ~ mysql_gr_port) | join(',') }}"
+mysql_gr_allowlist: "{{ groups.get('mysql', []) | map('extract', hostvars, 'node_addr') | map('regex_replace', '$', '/32') | join(',') }}"
+
+# ---- Kafka ------------------------------------------------------------------------
+kafka_node_id: "{{ groups.get('kafka_brokers', []).index(inventory_hostname) + 1 if inventory_hostname in groups.get('kafka_brokers', []) else 0 }}"
+kafka_cluster_id: "{{ lookup('ansible.builtin.file', generated_dir ~ '/kafka_cluster_id') }}"
+kafka_broker_count: "{{ groups.get('kafka_brokers', []) | length }}"
+
+# ---- Java -------------------------------------------------------------------------
+hadoop_java_home: "{{ java_catalog[hadoop_java_version | string].home }}"
+zookeeper_java_home: "{{ java_catalog[zookeeper_java_version | string].home }}"
+hive_java_home: "{{ java_catalog[hive_java_version | string].home }}"
+spark_java_home: "{{ java_catalog[spark_java_version | string].home }}"
+kafka_java_home: "{{ java_catalog[kafka_java_version | string].home }}"
+
+# ---- مسیرهای نصب -------------------------------------------------------------------
+hadoop_home: "{{ install_root }}/hadoop"
+hadoop_conf_dir: "{{ hadoop_home }}/etc/hadoop"
+hadoop_log_dir: "{{ log_root }}/hadoop"
+hadoop_pid_dir: "{{ run_root }}/hadoop"
+hdfs_nn_dir: "{{ data_root }}/hadoop/nn"
+hdfs_dn_dir: "{{ data_root }}/hadoop/dn"
+hdfs_jn_dir: "{{ data_root }}/hadoop/jn"
+yarn_local_dir: "{{ data_root }}/yarn/local"
+yarn_log_dir: "{{ data_root }}/yarn/logs"
+zookeeper_home: "{{ install_root }}/zookeeper"
+zookeeper_data_dir: "{{ data_root }}/zookeeper"
+zookeeper_log_dir: "{{ log_root }}/zookeeper"
+hive_home: "{{ install_root }}/hive"
+hive_conf_dir: "{{ hive_home }}/conf"
+spark_home: "{{ install_root }}/spark"
+kafka_home: "{{ install_root }}/kafka"
+kafka_data_dir: "{{ data_root }}/kafka"
+kafka_log_dir: "{{ log_root }}/kafka"
+jmx_dir: "{{ install_root }}/jmx_exporter"
+jmx_jar: jmx_prometheus_javaagent.jar
+jmx_config: "{{ jmx_dir }}/jmx-config.yml"
+
+# ---- HDFS directories needed by Hive ------------------------------------------------
+hdfs_hive_dirs:
+  - { path: /user/hive, mode: "0755", owner: "{{ hadoop_user }}" }
+  - { path: /user/hive/warehouse, mode: "1777", owner: "{{ hadoop_user }}" }
+  - { path: "/tmp/hive", mode: "1777", owner: "{{ hadoop_user }}" }

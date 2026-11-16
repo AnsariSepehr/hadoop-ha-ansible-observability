@@ -1,0 +1,6 @@
+---
+- name: Start ZKFC and verify its RPC listener
+  ansible.builtin.include_tasks: service.yml
+  vars:
+    svc: zkfc
+    svc_port: "{{ hdfs_zkfc_rpc_port }}"

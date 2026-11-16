@@ -1,0 +1,74 @@
+---
+# Prepares every cluster node once: hosts file, service user, SSH trust, OS tuning.
+- name: Build /etc/hosts block for all cluster members
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} KADOOP CLUSTER ({{ cluster_name }})"
+    block: |
+      {% for h in groups['cluster'] %}
+      {{ hostvars[h].ansible_host | default(h) }} {{ h }}
+      {% endfor %}
+  when: manage_etc_hosts | bool
+
+- name: Ensure service group exists
+  ansible.builtin.group:
+    name: "{{ hadoop_group }}"
+    state: present
+
+- name: Ensure service user exists
+  ansible.builtin.user:
+    name: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    home: "{{ hadoop_user_home }}"
+    shell: /bin/bash
+    create_home: true
+
+- name: Passwordless sudo for the service user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ hadoop_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    content: "{{ hadoop_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    validate: "visudo -cf %s"
+
+- name: Create base directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ install_root }}"
+    - "{{ data_root }}"
+
+- name: Ensure bashrc is read by login shells of the service user
+  ansible.builtin.blockinfile:
+    path: "{{ hadoop_user_home }}/.bash_profile"
+    create: true
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+    marker: "# {mark} KADOOP bashrc"
+    block: |
+      [ -f ~/.bashrc ] && . ~/.bashrc
+
+- name: Configure SSH trust for the service user
+  ansible.builtin.include_tasks: ssh.yml
+
+- name: Apply OS tuning
+  ansible.builtin.include_tasks: tuning.yml
+  when: manage_os_tuning | bool
+
+- name: Configure firewall
+  ansible.builtin.include_tasks: firewall.yml
+  when: manage_firewall | bool
+
+- name: Check time synchronisation
+  ansible.builtin.include_tasks: ntp.yml
+  when: ntp_check | bool
+
+- name: Write initialisation marker
+  ansible.builtin.copy:
+    dest: "{{ common_marker_file }}"
+    content: "{{ cluster_name }}\n"
+    mode: "0644"

@@ -1,0 +1,27 @@
+---
+- name: All brokers registered?
+  ansible.builtin.shell: >-
+    {{ kafka_home }}/bin/kafka-broker-api-versions.sh --bootstrap-server {{ node_addr }}:{{ kafka_broker_port }}
+    2>/dev/null | grep -c 'id: '
+  environment:
+    JAVA_HOME: "{{ kafka_java_home }}"
+  register: kafka_brokers_seen
+  until: kafka_brokers_seen.stdout | int == kafka_broker_count | int
+  retries: 12
+  delay: 10
+  changed_when: false
+
+- name: Create and describe a smoke-test topic
+  ansible.builtin.shell: |
+    B={{ node_addr }}:{{ kafka_broker_port }}
+    {{ kafka_home }}/bin/kafka-topics.sh --bootstrap-server $B --create --if-not-exists \
+      --topic {{ kafka_test_topic }} --partitions {{ kafka_broker_count }} --replication-factor {{ kafka_replication_factor }}
+    {{ kafka_home }}/bin/kafka-topics.sh --bootstrap-server $B --describe --topic {{ kafka_test_topic }}
+  environment:
+    JAVA_HOME: "{{ kafka_java_home }}"
+  register: kafka_topic
+  changed_when: false
+
+- name: Show topic
+  ansible.builtin.debug:
+    var: kafka_topic.stdout_lines

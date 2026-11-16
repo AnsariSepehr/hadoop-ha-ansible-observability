@@ -1,0 +1,9 @@
+---
+# Stops every Hadoop daemon that exists on this node, in reverse dependency order.
+- name: Stop Hadoop daemons present on this node
+  ansible.builtin.systemd:
+    name: "hadoop-{{ item.name }}"
+    state: stopped
+  loop: "{{ hadoop_units | reverse | list }}"
+  when: item.group in group_names
+  failed_when: false

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+  <property><name>ssl.server.keystore.type</name><value>jks</value></property>
+  <property><name>ssl.server.keystore.location</name><value>{{ hadoop_ssl_dir }}/keystore.jks</value></property>
+  <property><name>ssl.server.keystore.password</name><value>{{ ssl_keystore_password }}</value></property>
+  <property><name>ssl.server.keystore.keypassword</name><value>{{ ssl_keystore_password }}</value></property>
+  <property><name>ssl.server.truststore.type</name><value>jks</value></property>
+  <property><name>ssl.server.truststore.location</name><value>{{ hadoop_ssl_dir }}/truststore.jks</value></property>
+  <property><name>ssl.server.truststore.password</name><value>{{ ssl_keystore_password }}</value></property>
+  <property><name>ssl.server.truststore.reload.interval</name><value>10000</value></property>
+  <property><name>ssl.server.exclude.cipher.list</name><value>TLS_ECDHE_RSA_WITH_RC4_128_SHA,SSL_RSA_WITH_RC4_128_MD5,SSL_RSA_WITH_RC4_128_SHA,TLS_ECDH_ECDSA_WITH_RC4_128_SHA,TLS_ECDH_RSA_WITH_RC4_128_SHA</value></property>
+</configuration>

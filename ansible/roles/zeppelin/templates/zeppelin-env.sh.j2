@@ -1,0 +1,27 @@
+#!/bin/bash
+# Managed by Ansible - do not edit by hand, changes will be overwritten.
+
+{% if zeppelin_java_home | length > 0 %}
+export JAVA_HOME="{{ zeppelin_java_home }}"
+{% else %}
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+{% endif %}
+
+export ZEPPELIN_HOME="{{ zeppelin_home }}"
+export ZEPPELIN_LOG_DIR="{{ zeppelin_home }}/logs"
+export ZEPPELIN_PID_DIR="{{ zeppelin_home }}/run"
+export ZEPPELIN_NOTEBOOK_DIR="{{ zeppelin_home }}/notebook"
+
+export ZEPPELIN_PORT={{ zeppelin_port }}
+export ZEPPELIN_ADDR=0.0.0.0
+
+# Native Micrometer-based Prometheus endpoint, exposed at /metrics on the
+# same web port as the UI ({{ zeppelin_port }}) - NOT the JMX javaagent port.
+export ZEPPELIN_METRIC_ENABLE_PROMETHEUS=true
+
+# JVM options for the Zeppelin server process. The javaagent makes this JVM
+# expose Prometheus metrics on {{ zeppelin_jmx_port }}.
+export ZEPPELIN_MEM="{{ zeppelin_mem }} -javaagent:{{ zeppelin_jmx_jar }}={{ zeppelin_jmx_port }}:{{ zeppelin_jmx_dir }}/zeppelin-jmx.yml"
+
+# Memory for interpreter processes (separate JVMs, not covered by the javaagent above).
+export ZEPPELIN_INTP_MEM="{{ zeppelin_intp_mem }}"

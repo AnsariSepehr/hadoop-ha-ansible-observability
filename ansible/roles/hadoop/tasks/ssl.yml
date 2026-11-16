@@ -1,0 +1,152 @@
+---
+# Creates keystores/truststores. Mode "selfsigned": one key per node, every node trusts every certificate.
+# Mode "custom": one certificate shared by all nodes (generated_dir/ssl-custom/{certificate.pem,private.key,ca-bundle.pem}).
+- name: Create the TLS directory
+  ansible.builtin.file:
+    path: "{{ hadoop_ssl_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0750"
+
+- name: Validate TLS mode and keystore password
+  ansible.builtin.assert:
+    that:
+      - hadoop_ssl_mode in ['selfsigned', 'custom']
+      - ssl_keystore_password is defined
+      - ssl_keystore_password | string | length >= 6
+    fail_msg: >-
+      Set hadoop_ssl_mode to selfsigned or custom and define a strong
+      ssl_keystore_password (at least 6 characters; use a longer random
+      value for production) in the encrypted inventory/group_vars/all/secrets.yml file.
+
+- name: Create certificate staging directory on the Ansible controller
+  ansible.builtin.file:
+    path: "{{ generated_dir }}/ssl"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Self-signed certificates
+  when: hadoop_ssl_mode == 'selfsigned'
+  block:
+    # Hadoop may reach a node by its operating-system hostname (for example
+    # dn3) even when its Ansible inventory name is node3. Include both names
+    # in the certificate SAN or JournalNode HTTPS edit-log reads fail with
+    # "HTTPS hostname wrong" and the standby NameNode cannot replay edits.
+    - name: Inspect existing self-signed certificate SANs
+      ansible.builtin.command:
+        cmd: >-
+          {{ hadoop_java_home }}/bin/keytool -list -v
+          -keystore {{ hadoop_ssl_dir }}/keystore.jks
+          -storepass {{ ssl_keystore_password }} -alias {{ inventory_hostname }}
+      register: selfsigned_cert_info
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Remove stale self-signed stores when OS hostname is missing from SAN
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ hadoop_ssl_dir }}/keystore.jks"
+        - "{{ hadoop_ssl_dir }}/truststore.jks"
+        - "{{ hadoop_ssl_dir }}/{{ inventory_hostname }}.crt"
+      when:
+        - selfsigned_cert_info.rc != 0 or
+          ('DNS:' ~ (ansible_facts.hostname | lower)) not in (selfsigned_cert_info.stdout | lower)
+      no_log: true
+
+    - name: Generate key pair with inventory hostname, OS hostname and IP SANs
+      ansible.builtin.command:
+        cmd: >-
+          {{ hadoop_java_home }}/bin/keytool -genkeypair -alias {{ inventory_hostname }} -keyalg RSA -keysize 2048
+          -validity 3650 -dname "CN={{ inventory_hostname }},OU=Hadoop,O={{ cluster_name }}"
+          -ext "SAN=dns:{{ inventory_hostname }},dns:{{ ansible_facts.hostname }},ip:{{ node_addr }}"
+          -keystore {{ hadoop_ssl_dir }}/keystore.jks -storepass {{ ssl_keystore_password }} -keypass {{ ssl_keystore_password }}
+        creates: "{{ hadoop_ssl_dir }}/keystore.jks"
+      no_log: true
+
+    - name: Export the certificate
+      ansible.builtin.command:
+        cmd: >-
+          {{ hadoop_java_home }}/bin/keytool -exportcert -rfc -alias {{ inventory_hostname }}
+          -keystore {{ hadoop_ssl_dir }}/keystore.jks -storepass {{ ssl_keystore_password }}
+          -file {{ hadoop_ssl_dir }}/{{ inventory_hostname }}.crt
+        creates: "{{ hadoop_ssl_dir }}/{{ inventory_hostname }}.crt"
+      no_log: true
+
+    - name: Collect certificates on the control node
+      ansible.builtin.fetch:
+        src: "{{ hadoop_ssl_dir }}/{{ inventory_hostname }}.crt"
+        dest: "{{ generated_dir }}/ssl/{{ inventory_hostname }}.crt"
+        flat: true
+
+    - name: Distribute every certificate to every node
+      ansible.builtin.copy:
+        src: "{{ generated_dir }}/ssl/{{ item }}.crt"
+        dest: "{{ hadoop_ssl_dir }}/trust-{{ item }}.crt"
+        owner: "{{ hadoop_user }}"
+        group: "{{ hadoop_group }}"
+        mode: "0644"
+      loop: "{{ ansible_play_hosts }}"
+
+    - name: Import all certificates into the truststore
+      ansible.builtin.shell: |
+        {{ hadoop_java_home }}/bin/keytool -list -alias {{ item }} -keystore {{ hadoop_ssl_dir }}/truststore.jks \
+          -storepass {{ ssl_keystore_password }} >/dev/null 2>&1 ||
+        {{ hadoop_java_home }}/bin/keytool -importcert -noprompt -alias {{ item }} -file {{ hadoop_ssl_dir }}/trust-{{ item }}.crt \
+          -keystore {{ hadoop_ssl_dir }}/truststore.jks -storepass {{ ssl_keystore_password }}
+      loop: "{{ ansible_play_hosts }}"
+      no_log: true
+      changed_when: true
+
+- name: CA-signed certificate
+  when: hadoop_ssl_mode == 'custom'
+  block:
+    - name: Check the certificate files on the control node
+      ansible.builtin.stat:
+        path: "{{ hadoop_ssl_custom_dir }}/{{ item }}"
+      delegate_to: localhost
+      become: false
+      register: ssl_files
+      loop: [certificate.pem, private.key, ca-bundle.pem]
+
+    - name: Require all custom certificate files
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "Missing custom TLS file: {{ hadoop_ssl_custom_dir }}/{{ item.item }}"
+      loop: "{{ ssl_files.results }}"
+
+    - name: Copy PEM files
+      ansible.builtin.copy:
+        src: "{{ hadoop_ssl_custom_dir }}/{{ item }}"
+        dest: "{{ hadoop_ssl_dir }}/{{ item }}"
+        mode: "0600"
+      loop: [certificate.pem, private.key, ca-bundle.pem]
+
+    - name: Build PKCS12 and import into the keystore
+      ansible.builtin.shell: |
+        openssl pkcs12 -export -in certificate.pem -inkey private.key -certfile ca-bundle.pem \
+          -name hadoop-ssl -out certificate.p12 -passout pass:{{ ssl_keystore_password }}
+        rm -f keystore.jks
+        {{ hadoop_java_home }}/bin/keytool -importkeystore -srckeystore certificate.p12 -srcstoretype PKCS12 \
+          -srcstorepass {{ ssl_keystore_password }} -destkeystore keystore.jks -deststorepass {{ ssl_keystore_password }} -noprompt
+        rm -f truststore.jks
+        {{ hadoop_java_home }}/bin/keytool -importcert -noprompt -alias ca -file ca-bundle.pem \
+          -keystore truststore.jks -storepass {{ ssl_keystore_password }}
+      args:
+        chdir: "{{ hadoop_ssl_dir }}"
+      no_log: true
+      changed_when: true
+
+- name: Fix ownership of the TLS directory
+  ansible.builtin.file:
+    path: "{{ hadoop_ssl_dir }}"
+    state: directory
+    recurse: true
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"

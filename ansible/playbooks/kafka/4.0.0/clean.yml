@@ -1,0 +1,33 @@
+---
+- name: Remove Kafka
+  hosts: kafka_brokers
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "Add -e confirm_destroy_data=yes"
+
+    - ansible.builtin.systemd: { name: kafka, state: stopped, enabled: false }
+      failed_when: false
+
+    - name: Kill Kafka JVM
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kill_java
+      vars:
+        kill_java_label: "kafka"
+        kill_java_user: kafka
+        kill_java_patterns:
+          - 'kafka[.]Kafka'
+          - 'kafka[.]server[.]KafkaRaftServer'
+          - 'org[.]apache[.]kafka[.]'
+
+    - ansible.builtin.file: { path: "{{ item }}", state: absent }
+      loop:
+        - /etc/systemd/system/kafka.service
+        - /usr/local/bin/kafka-cli
+        - "{{ kafka_home }}"
+        - "{{ install_root }}/kafka-{{ kafka_version }}"
+        - "{{ kafka_data_dir }}"
+        - "{{ kafka_log_dir }}"
+
+    - ansible.builtin.systemd: { daemon_reload: true }

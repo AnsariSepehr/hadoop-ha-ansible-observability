@@ -1,0 +1,4 @@
+---
+- name: Start DataNode
+  ansible.builtin.include_tasks: service.yml
+  vars: { svc: datanode, svc_port: "{{ hdfs_dn_data_port }}" }

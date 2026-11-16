@@ -1,0 +1,115 @@
+---
+- name: Ensure HiveServer2 local scratch directory exists
+  ansible.builtin.file:
+    path: "{{ hive_local_scratch_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0750"
+
+- name: Start the metastore
+  ansible.builtin.systemd:
+    name: hive-metastore
+    state: started
+    enabled: true
+
+- name: Wait for the metastore port
+  ansible.builtin.wait_for:
+    host: "{{ node_addr }}"
+    port: "{{ hive_metastore_port }}"
+    state: started
+    timeout: 180
+
+# A successful systemd start only means the process was launched. HiveServer2
+# can still exit during JVM/Hive initialisation, so collect its real logs when
+# the Thrift listener does not appear.
+- name: Start and verify HiveServer2
+  block:
+    - name: Start HiveServer2
+      ansible.builtin.systemd:
+        name: hive-server2
+        state: started
+        enabled: true
+
+    - name: Wait for the HiveServer2 Thrift port
+      ansible.builtin.wait_for:
+        host: "{{ node_addr }}"
+        port: "{{ hive_server2_port }}"
+        state: started
+        connect_timeout: 5
+        sleep: 3
+        timeout: "{{ hive_server2_start_timeout | default(120) | int }}"
+
+  rescue:
+    - name: Collect HiveServer2 startup diagnostics
+      ansible.builtin.shell: |
+        set +e
+        echo '===== HiveServer2 systemd status ====='
+        systemctl status hive-server2 --no-pager -l 2>&1
+        echo '===== HiveServer2 journal (last 250 lines) ====='
+        journalctl -u hive-server2 -n 250 --no-pager -o cat 2>&1
+        echo '===== HiveServer2 log ====='
+        for f in \
+          "{{ hive_log_dir }}/hive-server2.log" \
+          "{{ hive_log_dir }}/hive-server2.out" \
+          /var/log/hive/hive-server2.log \
+          /var/log/hive/hive-server2.out; do
+          if [ -f "$f" ]; then
+            echo "--- $f (last 200 lines) ---"
+            tail -n 200 "$f"
+          fi
+        done
+        echo '===== Relevant HiveServer2 errors ====='
+        grep -RniE 'ERROR|FATAL|Exception|Caused by:|NoSuchMethodError|ClassNotFoundException|Access denied|Connection refused' \
+          "{{ hive_log_dir }}" 2>/dev/null | tail -n 120
+        echo '===== Metastore status and recent journal ====='
+        systemctl status hive-metastore --no-pager -l 2>&1
+        journalctl -u hive-metastore -n 80 --no-pager -o cat 2>&1
+        echo '===== Process and listener ====='
+        ps -ef | grep -E '[H]iveServer2|[H]iveMetaStore'
+        ss -lntp 2>/dev/null | grep -E ':(10000|{{ hive_metastore_port }})[[:space:]]' || true
+        echo '===== Hive configuration (password redacted) ====='
+        sed -E 's#(<name>javax.jdo.option.ConnectionPassword</name><value>)[^<]*(</value>)#\1[REDACTED]\2#' \
+          "{{ hive_conf_dir }}/hive-site.xml" 2>/dev/null
+      args:
+        executable: /bin/bash
+      register: hive_server2_diagnostics
+      changed_when: false
+      failed_when: false
+
+    - name: Print HiveServer2 startup diagnostics
+      ansible.builtin.debug:
+        var: hive_server2_diagnostics.stdout_lines
+
+    - name: Fail with HiveServer2 startup context
+      ansible.builtin.fail:
+        msg: >-
+          HiveServer2 did not open {{ node_addr }}:{{ hive_server2_port }}.
+          The service journal and Hive logs are printed above; fix the first
+          underlying ERROR/Exception rather than increasing the port timeout.
+
+- name: Bootstrap the default database via the Hive CLI
+  ansible.builtin.shell: |
+    set -e
+    {{ hive_home }}/bin/hive \
+      --hiveconf hive.metastore.uris=thrift://{{ node_addr }}:{{ hive_metastore_port }} \
+      -e "CREATE DATABASE IF NOT EXISTS default LOCATION '/user/hive/warehouse';" 2>&1
+  environment: "{{ hive_env }}"
+  become: true
+  become_user: "{{ hadoop_user }}"
+  register: hive_seed_default
+  changed_when: "'FAILED' not in hive_seed_default.stdout"
+
+- name: Smoke test through Beeline
+  ansible.builtin.command: >-
+    {{ hive_home }}/bin/beeline
+    -u jdbc:hive2://{{ node_addr }}:{{ hive_server2_port }}/default
+    -n {{ hadoop_user }} --silent=true -e "SHOW DATABASES;"
+  environment: "{{ hive_env }}"
+  become: true
+  become_user: "{{ hadoop_user }}"
+  register: hive_beeline
+  retries: 6
+  delay: 10
+  until: hive_beeline.rc == 0
+  changed_when: false

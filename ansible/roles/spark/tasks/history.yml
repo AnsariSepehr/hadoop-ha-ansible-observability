@@ -1,0 +1,15 @@
+---
+- name: Start the Spark History Server
+  ansible.builtin.systemd:
+    name: spark-history-server
+    state: started
+    enabled: true
+
+- name: Wait for the UI
+  ansible.builtin.uri:
+    url: "http://{{ node_addr }}:{{ spark_history_port }}"
+    status_code: 200
+  register: spark_ui
+  retries: 12
+  delay: 5
+  until: spark_ui.status == 200

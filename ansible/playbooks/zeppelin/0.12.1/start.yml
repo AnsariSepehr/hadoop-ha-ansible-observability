@@ -1,0 +1,12 @@
+---
+# Start Apache Zeppelin
+# Run: ansible-playbook playbooks/zeppelin/0.12.1/start.yml
+- name: Start Apache Zeppelin
+  hosts: zeppelin
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run zeppelin role (start)
+      ansible.builtin.include_role:
+        name: zeppelin
+        tasks_from: start

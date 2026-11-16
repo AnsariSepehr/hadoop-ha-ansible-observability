@@ -1,0 +1,151 @@
+---
+- name: Safety check for a forced re-format
+  ansible.builtin.assert:
+    that:
+      - confirm_destroy_data | default('no') == 'yes'
+    fail_msg: >-
+      Re-format destroys HDFS metadata on the NameNodes and JournalNodes.
+      To confirm this destructive operation, add both
+      -e hdfs_force_reformat=true -e confirm_destroy_data=yes.
+  when: hdfs_force_reformat | bool
+
+- name: Is the NameNode directory already formatted?
+  ansible.builtin.stat:
+    path: "{{ hdfs_nn_dir }}/current/VERSION"
+  register: nn_version
+
+- name: Inspect the primary NameNode directory when its VERSION metadata is missing
+  ansible.builtin.find:
+    paths: "{{ hdfs_nn_dir }}"
+    file_type: any
+    hidden: true
+    recurse: false
+  register: primary_nn_contents
+  failed_when: false
+  when: not nn_version.stat.exists
+
+- name: Refuse to format over unrecognised primary NameNode contents
+  ansible.builtin.assert:
+    that:
+      - hdfs_force_reformat | bool or (primary_nn_contents.matched | default(0) | int) == 0
+    fail_msg: >-
+      {{ hdfs_nn_dir }} contains files but has no current/VERSION. Refusing to overwrite potentially
+      recoverable NameNode metadata. Restore the matching VERSION metadata or explicitly confirm
+      a complete HDFS reformat with -e hdfs_force_reformat=true -e confirm_destroy_data=yes.
+  when: not nn_version.stat.exists
+
+- name: Check whether JournalNode metadata exists on each JournalNode
+  ansible.builtin.stat:
+    path: "{{ hdfs_jn_dir }}/current/VERSION"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups.get('journalnodes', []) }}"
+  register: jn_metadata_check
+  changed_when: false
+
+- name: Refuse to format a new NameNode over an existing JournalNode namespace
+  ansible.builtin.assert:
+    that:
+      - hdfs_force_reformat | bool or not ((not nn_version.stat.exists) and ((jn_metadata_check.results | default([]) | selectattr('stat.exists') | list | length) > 0))
+    fail_msg: >-
+      NameNode metadata is missing but one or more JournalNodes already contain a namespace.
+      Refusing to format a different namespace over existing HDFS edits. Restore the matching
+      NameNode VERSION metadata, or explicitly confirm a complete HDFS reformat with
+      -e hdfs_force_reformat=true -e confirm_destroy_data=yes.
+  when: not nn_version.stat.exists
+
+- name: Warn if JournalNode data exists while the NameNode is unformatted
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: JournalNode data exists but the NameNode is unformatted.
+      Formatting now will create a new namespace. This is expected on a fresh
+      install. If you lost a NameNode, restore its VERSION file instead.
+  when:
+    - not nn_version.stat.exists
+    - (jn_metadata_check.results | default([]) | selectattr('stat.exists') | list | length) > 0
+
+- name: Stop NameNode/ZKFC and wipe NameNode metadata (forced re-format only)
+  ansible.builtin.shell: |
+    set -eu
+    systemctl stop hadoop-zkfc hadoop-namenode 2>/dev/null || true
+    if [ -d "{{ hdfs_nn_dir }}" ]; then
+      find "{{ hdfs_nn_dir }}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: hdfs_force_reformat | bool
+
+- name: Wipe JournalNode data (forced re-format only)
+  ansible.builtin.shell: |
+    set -eu
+    systemctl stop hadoop-journalnode 2>/dev/null || true
+    pkill -9 -f '[o]rg.apache.hadoop.hdfs.qjournal.server.JournalNode' 2>/dev/null || true
+    rm -rf -- "{{ hdfs_jn_dir }}"
+    install -d -m 0700 -o "{{ hadoop_user }}" -g "{{ hadoop_group }}" "{{ hdfs_jn_dir }}"
+  args:
+    executable: /bin/bash
+  delegate_to: "{{ item }}"
+  loop: "{{ groups.get('journalnodes', []) }}"
+  changed_when: true
+  when: hdfs_force_reformat | bool
+
+- name: Format the NameNode
+  ansible.builtin.command: >-
+    {{ hadoop_run }} {{ hadoop_home }}/bin/hdfs namenode -format -nonInteractive
+    -clusterid {{ hdfs_cluster_id }} -force
+  environment: "{{ hadoop_env | combine({'HDFS_NAMENODE_OPTS': ''}) }}"
+  when: hdfs_force_reformat | bool or not nn_version.stat.exists
+  register: nn_format
+  changed_when: true
+
+- name: Stop ZKFC before re-initialising the HA znode
+  ansible.builtin.systemd:
+    name: hadoop-zkfc
+    state: stopped
+  failed_when: false
+  when: hdfs_force_reformat | bool or not nn_version.stat.exists
+
+- name: Clear any leftover ZKFC pid file
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hadoop_pid_dir }}/hadoop-hadoop-zkfc.pid"
+    - "/run/hadoop/hadoop-hadoop-zkfc.pid"
+    - "/var/run/hadoop/hadoop-hadoop-zkfc.pid"
+  failed_when: false
+  when: hdfs_force_reformat | bool or not nn_version.stat.exists
+
+- name: Kill any orphaned ZKFC JVM on this NameNode
+  ansible.builtin.shell: |
+    for pid in $(pgrep -f 'org[.]apache[.]hadoop[.]hdfs[.]tools[.]DFSZKFailoverController' 2>/dev/null); do
+      comm=$(ps -o comm= -p "$pid" 2>/dev/null)
+      [ "$comm" = "java" ] && kill -9 "$pid" 2>/dev/null
+    done
+    exit 0
+  changed_when: false
+  args:
+    executable: /bin/bash
+  when: hdfs_force_reformat | bool or not nn_version.stat.exists
+
+- name: Initialise the HA znode in ZooKeeper (rc 2 = already exists)
+  ansible.builtin.command: >-
+    {{ hadoop_run }} {{ hadoop_home }}/bin/hdfs zkfc -formatZK -nonInteractive
+  environment: "{{ hadoop_env | combine({'HDFS_ZKFC_OPTS': ''}) }}"
+  register: zk_format
+  failed_when: zk_format.rc not in [0, 2]
+  changed_when: zk_format.rc == 0
+  when: hdfs_force_reformat | bool or not nn_version.stat.exists
+
+- name: Start the first NameNode
+  ansible.builtin.include_tasks: service.yml
+  vars:
+    svc: namenode
+    svc_port: "{{ hdfs_nn_rpc_port }}"
+
+# CRITICAL: Wait for the first NameNode to firmly establish RPC before proceeding
+- name: Wait for the first NameNode to respond on port 8020
+  ansible.builtin.wait_for:
+    host: "{{ node_addr }}"
+    port: "{{ hdfs_nn_rpc_port }}"
+    timeout: 180

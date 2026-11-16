@@ -1,0 +1,2879 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "This dashboard provides a Detailed DrillDown view of the Trino Workers Status, performance, and resource usage. Metrics are scraped by Prometheus via the jmx-exporter for Trino Workers deployments.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 35,
+      "title": "CPU Usage",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "It represents the cumulative CPU time consumed by the Trino worker or coordinator process. The value keeps increasing over time as the process continues to run. The value keeps increasing over time as the process continues to run. ",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_cpu_seconds_total{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_cpu_seconds_total{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_cpu_seconds_total{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Total CPU time spent in seconds",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric provides an instantaneous snapshot of how much CPU Trino is using at the moment. Helps in real-time CPU monitoring of Trino workers.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "java_lang_operatingsystem_processcpuload{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "java_lang_operatingsystem_processcpuload{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "java_lang_operatingsystem_processcpuload{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "CPU load of the process",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 36,
+      "title": "Memory Usage",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric tracks the virtual memory allocated for the Trino process, including: Resident memory (RAM), Memory-mapped files, Swapped memory, and Heap and non-heap memory. It is a cumulative metric and does not reflect actual physical memory usage. The value can be significantly larger than the actual RAM usage due to memory mapping and JVM allocations.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_virtual_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} / (1024 * 1024 * 1024)",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_virtual_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_virtual_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Total virtual memory used by the process (GB)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric tracks the resident set size (RSS), which is the amount of memory physically loaded into RAM for the Trino process. Unlike process_virtual_memory_bytes, which includes mapped files and swap, process_resident_memory_bytes reflects the actual RAM usage. It is useful for monitoring memory pressure on the system. Helps detect high memory consumption of Trino workers. Can indicate potential memory leaks or insufficient heap size. Useful for setting up alerts to prevent OOM (Out of Memory) errors.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_resident_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} / (1024 * 1024 * 1024)",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_resident_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_resident_memory_bytes{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Physical memory used by the process (GB)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "It tracks memory usage across different JVM memory pools: Heap memory (used by Java objects) Useful for detecting heap memory leaks or excessive memory consumption. Can indicate when Garbage Collection (GC) tuning is needed. Useful for troubleshooting OOM (Out of Memory) issues.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} / (1024 * 1024 * 1024)",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} offset 1d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} offset 7d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Used heap memory (GB)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Non-heap memory includes memory used outside the main Java object heap, such as: Metaspace (stores class metadata), Code Cache (used for JIT-compiled code), Compressed Class Space (stores class-related structures), and Direct Buffers (memory allocated outside JVM heap by NIO). Useful for detecting Metaspace exhaustion or JIT compiler memory pressure. Can indicate class loader memory leaks if non-heap memory usage keeps increasing.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"nonheap\"} / (1024 * 1024 * 1024)",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"nonheap\"} offset 1d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_used_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"nonheap\"} offset 7d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Used non-heap memory (GB)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric tracks the configured memory limits for different JVM memory regions. It can be broken down by: Heap memory (area=\"heap\") → Limited by -Xmx JVM option, and Non-heap memory (area=\"nonheap\") → Includes Metaspace, Code Cache, etc.  value of -1 (or missing) for some memory pools means no fixed limit (e.g., Metaspace in newer JVM versions).Useful for tuning heap size (-Xmx) and Metaspace (-XX:MaxMetaspaceSize). Can detect when Trino is approaching its memory cap, helping prevent OutOfMemoryErrors (OOMs).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_max_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} / (1024 * 1024 * 1024)",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_max_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} offset 1d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_max_bytes{instance=\"${cluster}:9404\", job=\"${job}\", area=\"heap\"} offset 7d / (1024 * 1024 * 1024) ",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Max heap memory available (GB)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 37,
+      "title": "File Descriptors",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "File descriptors (FDs) are handles used by the OS to manage open files, network sockets, and inter-process communication. This metric reflects how many FDs the Trino process is currently using. The value increases with more active queries, since Trino opens files, sockets, and network connections dynamically. Helps monitor resource usage and detect potential file descriptor leaks. If process_open_fds approaches the system limit (ulimit -n), Trino may fail with \"Too many open files\" errors. Useful for troubleshooting high connection usage in Trino workers.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_open_fds{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_open_fds{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_open_fds{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Number of open file descriptors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "process_max_fds represents the maximum number of file descriptors (FDs) the Trino process is allowed to use, as set by the operating system. This is the upper limit on file descriptors imposed by the OS (ulimit -n on Linux). It includes handles for: Open files, Network sockets, and Inter-process communication (IPC). Default limits vary by system but can be adjusted in /etc/security/limits.conf or systemd service files. If process_open_fds approaches process_max_fds, Trino may encounter \"Too many open files\" errors. Useful for troubleshooting connection issues, especially in high-query workloads.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_max_fds{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_max_fds{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "process_max_fds{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Maximum file descriptors limit",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 38,
+      "title": "Garbage Collection (GC) Performance",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "In Trino JMX metrics, jvm_gc_collection_seconds_sum{gc=\"G1 Young Generation\"} represents the total time spent in garbage collection (GC) for the G1 Young Generation, measured in seconds. The G1 Young Generation GC: Collects short-lived objects in the young generation, Runs frequently but is usually fast, and Helps prevent excessive old-generation garbage collection. The value of this metric accumulates over time as the JVM performs GC cycles. Helps monitor GC pause times in Trino workers. If the sum is high, it could indicate frequent GC pauses affecting query performance.  Useful for tuning JVM GC settings (-XX:InitiatingHeapOccupancyPercent, -XX:G1HeapRegionSize, etc.).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"${job}\", gc=\"G1 Young Generation\"}[$__rate_interval])",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"${job}\", gc=\"G1 Young Generation\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"${job}\", gc=\"G1 Young Generation\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Total time spent in GC (s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "jvm_gc_collection_seconds_sum{gc=\"G1 Old Generation\"} represents the total time spent in garbage collection (GC) for the G1 Old Generation. This metric tracks Garbage Collection (GC) time specifically for the G1 Old Generation, which: Handles long-lived objects that survived multiple Young GC cycles, Runs less frequently but can cause longer pauses, and If triggered too often, it may indicate heap pressure or inefficient GC tuning. The value accumulates over time, increasing whenever an Old GC cycle occurs. High values suggest excessive GC time, which can impact query execution latency. Useful for tuning JVM GC parameters (e.g., -XX:MaxGCPauseMillis, -XX:G1MixedGCCountTarget).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"$job\", gc=\"G1 Old Generation\"}[$__rate_interval])",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"$job\", gc=\"G1 Old Generation\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_gc_collection_seconds_sum{instance=\"${cluster}:9404\", job=\"$job\", gc=\"G1 Old Generation\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Total time for full GC (s)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 39,
+      "title": "JVM Thread Activity",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric reflects the total number of threads active within the JVM at a given moment, including: Application threads (e.g., Trino worker threads), and JVM internal threads (e.g., GC threads, JIT compiler threads). t provides insight into the thread utilization of the JVM, helping to understand how many threads are being used by Trino and the JVM runtime at a given time. Helps monitor the concurrency of Trino workers. A sudden spike in thread usage could indicate heavy query execution or thread contention issues. Useful for identifying resource exhaustion or thread leaks that could impact Trino's performance. Can be useful when setting JVM thread limits or tuning thread pools for specific workloads.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_current{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_current{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_current{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Number of active threads",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Daemon threads are background threads that do not prevent the JVM from exiting when all non-daemon threads finish. Common examples of daemon threads include: Garbage Collection (GC) threads, Finalizer threads, and Thread pools for background tasks (e.g., in Trino workers or JVM internals). This metric tracks how many active daemon threads exist at the moment. Helps monitor background tasks within Trino and the JVM. Excessive daemon threads may indicate problems with background processing, such as GC threads running too often or unnecessary background tasks consuming resources. Useful for identifying issues with thread management, especially in high-concurrency environments like Trino.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_daemon{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_daemon{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_daemon{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Number of daemon threads",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric shows the highest number of threads that the JVM has ever had running at the same time, which includes: Application threads (for Trino worker tasks, query execution, etc.), and JVM internal threads (e.g., GC threads, JIT compiler threads). It is a cumulative metric and does not reset unless the JVM is restarted. Helps understand the maximum thread usage in the Trino process. Can indicate if there was a temporary spike in thread usage, which could be related to: Heavy query load, Excessive thread pool usage, and Thread contention issues. Useful for optimizing thread pool sizes or identifying potential bottlenecks where thread limits could be set.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 61
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_peak{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_peak{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_peak{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Peak thread count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Deadlocked threads occur when two or more threads are blocked, waiting for resources that the other threads hold, causing a cycle of dependencies that prevents any of them from proceeding. This metric tracks the number of threads in the JVM that are in a deadlocked state. Deadlock typically happens in multi-threaded applications when there is improper synchronization or resource contention. elps detect deadlock situations within the JVM, which could freeze or severely impact Trino's performance. Deadlock is often a sign of: Improper locking or race conditions, and Inadequate thread management (e.g., excessive thread creation or improper synchronization mechanisms). It is crucial to address deadlocks to prevent service downtime or stalled operations in Trino.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 61
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_deadlocked{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_deadlocked{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_deadlocked{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Deadlocked threads)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "BLOCKED threads occur when a thread is waiting to acquire a lock that is currently held by another thread. This is a normal state in multithreaded applications where threads coordinate through synchronization (e.g., synchronized blocks in Java). The thread remains in the BLOCKED state until it successfully acquires the lock it is waiting for. Helps monitor thread contention in Trino and identify performance bottlenecks. A high number of BLOCKED threads could indicate: Excessive synchronization or improper lock management, and Thread contention for critical resources, affecting performance. This can be particularly useful for identifying slow query execution or deadlock potential in highly concurrent environments like Trino.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 69
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_state{instance=\"${cluster}:9404\", job=\"${job}\", state=\"BLOCKED\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_state{instance=\"${cluster}:9404\", job=\"${job}\", state=\"BLOCKED\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_state{instance=\"${cluster}:9404\", job=\"${job}\", state=\"BLOCKED\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Blocked threads",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 78
+      },
+      "id": 40,
+      "title": "Metastore Performance",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "The getTable operation in the Hive metastore retrieves metadata for a specific table in the Hive catalog, such as: Table schema, Column types,  Partition information, and Table properties. The metric tracks the latency of this metadata request, specifically when the Thrift protocol is used for communication between Trino and the Hive metastore.  The value of this metric indicates how long it takes, on average, for Trino to receive the table metadata from the Hive metastore for the requested table. This metric helps monitor performance issues related to querying table metadata in Hive. High latency can indicate potential bottlenecks in: Hive metastore performance (e.g., slow queries or overloaded metastore), Network issues between Trino and the Hive metastore, and Concurrency issues when multiple queries request metadata simultaneously. If the average getTable time is high, it can lead to slower query execution since Trino needs metadata to plan and execute queries.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 79
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_gettable_time_oneminute_p99{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_gettable_time_oneminute_p99{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_gettable_time_oneminute_p99{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Hive Metastore Table Retrieval Latency (99th Percentile - 1 Minute)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "The commitTransaction operation is part of the Hive metastore API and is used to commit a transaction after performing operations like adding, modifying, or deleting data (e.g., tables, partitions). This metric counts how many times this commit operation has been performed within the last 5 minutes. It helps to track the frequency of transaction commits to the Hive metastore. These commit transactions ensure that changes made to the metastore are properly saved and persisted. This metric helps monitor transactional activity in the Hive metastore: Frequent commits can indicate heavy interaction with the metastore, potentially due to high write operations (e.g., adding partitions, modifying tables), and A sudden increase in the count could point to performance bottlenecks or concurrency issues if the transaction commits are taking too long or are blocking. Understanding the number of commits can help: Optimize metastore performance, and Monitor transaction load to ensure it doesn't overwhelm the metastore.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 79
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_committransaction_time_fiveminutes_count{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_committransaction_time_fiveminutes_count{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_committransaction_time_fiveminutes_count{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Hive Metastore Commit Transaction Count (5-Minute Interval)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 88
+      },
+      "id": 41,
+      "title": "Metastore Failures & Exceptions",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "dropTable is a Hive Metastore operation that deletes a table's metadata from the Hive catalog. This metric counts how many times the dropTable operation failed due to a metastore exception. Metastore exceptions can occur due to: Permission issues (e.g., insufficient privileges to drop a table), Table not found errors (e.g., trying to drop a non-existent table), Connection failures between Trino and the Hive Metastore, and Concurrency conflicts if multiple operations are modifying the same table. Helps monitor Hive Metastore reliability when dropping tables. Frequent failures might indicate: Misconfigurations in Trino's Hive connector, Hive Metastore instability or network issues, and Permission or authentication problems in Hive Metastore. Useful for setting up alerts in monitoring systems to detect persistent failures.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 89
+      },
+      "id": 33,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_droptable_metastoreexceptions_totalcount{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_droptable_metastoreexceptions_totalcount{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_droptable_metastoreexceptions_totalcount{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Trino Hive Metastore DropTable Exceptions Monitoring",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "getDatabase Operation: This is a Hive Metastore API call that retrieves metadata about a specific database (schema) in Hive, and It returns database details like its location, owner, parameters, and creation time. Failures Counted in This Metric: Database Not Found – The requested database does not exist, Permission Denied – Trino lacks the necessary privileges to access the database, Metastore Connection Issues – Network failures, timeout issues, or Hive Metastore service outages, and Thrift Communication Errors – Problems with Trino communicating with the Hive Metastore over Thrift. Fifteen-Minute Rate: This metric provides the rate of failures per second, averaged over a 15-minute window, and A high value could indicate Hive Metastore instability or query failures due to missing databases. Frequent failures may suggest network issues, misconfigured permissions, or service failures in the Hive Metastore. If the failure rate spikes, it could mean: Trino queries are failing due to missing databases, The Hive Metastore is down or overloaded, and There are permission issues affecting multiple queries. Alerts can be set up using Prometheus & Grafana to trigger notifications when this failure rate exceeds a certain threshold.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 89
+      },
+      "id": 34,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_getdatabase_totalfailures_fifteenminute_rate{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_getdatabase_totalfailures_fifteenminute_rate{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "trino_plugin_hive_metastore_thrift_thrifthivemetastore_getdatabase_totalfailures_fifteenminute_rate{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Trino Hive Metastore GetDatabase Failure Rate (15 min)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      },
+      "id": 42,
+      "title": "Configuration Reloads",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric tracks the number of times the JMX configuration has been successfully reloaded. A configuration reload typically occurs when Trino detects changes in its configuration files (such as config.properties, jvm.config, or other configuration files) and reloads them dynamically without needing a restart. It helps ensure that the configuration changes are applied properly without needing to restart the Trino service, which can be beneficial for high availability and minimizing downtime. This metric is helpful for monitoring and troubleshooting: Successful reloads indicate that Trino is able to dynamically apply configuration changes correctly, and If the count is low or absent, it might suggest that configuration reloads are not happening, or there may be an issue with configuration reloading. It can be used to track changes to JMX settings (like metrics.properties or other Trino-specific settings) that might affect how Trino interacts with JMX or how metrics are collected.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 99
+      },
+      "id": 30,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_success_total{instance=\"${cluster}:9404\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_success_total{instance=\"${cluster}:9404\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_success_total{instance=\"${cluster}:9404\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Trino JMX Configuration Reload Success",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "This metric tracks the number of times the JMX configuration failed to reload due to errors. A configuration reload failure can occur if: The configuration file contains syntax errors or invalid settings, There are permission issues preventing Trino from accessing the config file, and The JMX subsystem encounters an issue while applying new settings. This metric is useful for monitoring and troubleshooting: Frequent failures indicate potential misconfigurations or system issues, Helps prevent downtime by identifying reload failures early, and Can be used in alerting systems to notify administrators when configuration reloads fail.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 99
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_failure_total{instance=\"${cluster}:7078\", job=\"${job}\"}",
+          "legendFormat": "{{instance}}-today",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_failure_total{instance=\"${cluster}:7078\", job=\"${job}\"} offset 1d",
+          "instant": false,
+          "legendFormat": "{{instance}}-yesterday",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jmx_config_reload_failure_total{instance=\"${cluster}:7078\", job=\"${job}\"} offset 7d",
+          "instant": false,
+          "legendFormat": "{{instance}}-7 days ago",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Trino JMX Configuration Reload Failure",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "Trino",
+    "JMX Exporter",
+    "DrillDown"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "worker1",
+          "value": "192.0.2.12"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "host",
+        "multi": false,
+        "name": "cluster",
+        "options": [
+          {
+            "selected": true,
+            "text": "worker1",
+            "value": "192.0.2.12"
+          },
+          {
+            "selected": false,
+            "text": "worker2",
+            "value": "192.0.2.13"
+          },
+          {
+            "selected": false,
+            "text": "worker3",
+            "value": "192.0.2.14"
+          },
+          {
+            "selected": false,
+            "text": "worker4",
+            "value": "192.0.2.15"
+          }
+        ],
+        "query": "worker1 : 192.0.2.12,worker2 : 192.0.2.13,worker3 : 192.0.2.14,worker4 : 192.0.2.15",
+        "skipUrlSync": false,
+        "type": "custom",
+        "valuesFormat": "csv"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "trino_jmx",
+          "value": "trino_jmx"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Job",
+        "multi": false,
+        "name": "job",
+        "options": [
+          {
+            "selected": true,
+            "text": "trino_jmx",
+            "value": "trino_jmx"
+          }
+        ],
+        "query": "trino_jmx",
+        "skipUrlSync": false,
+        "type": "custom",
+        "valuesFormat": "csv"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Trino worker DrillDown",
+  "uid": "aedsyazec5f5sd",
+  "version": 6
+}

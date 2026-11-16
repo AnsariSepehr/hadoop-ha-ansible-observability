@@ -1,0 +1,32 @@
+---
+- name: Remove ZooKeeper
+  hosts: zookeepers
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "Add -e confirm_destroy_data=yes"
+
+    - ansible.builtin.systemd: { name: zookeeper, state: stopped, enabled: false }
+      failed_when: false
+
+    - name: Kill ZK JVM
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kill_java
+      vars:
+        kill_java_label: "zookeeper"
+        kill_java_patterns:
+          - 'org[.]apache[.]zookeeper[.]server[.]quorum[.]QuorumPeerMain'
+
+    - ansible.builtin.file: { path: "{{ item }}", state: absent }
+      loop:
+        - /etc/systemd/system/zookeeper.service
+        - /etc/profile.d/zookeeper.sh
+        - /etc/tmpfiles.d/zookeeper.conf
+        - "{{ run_root }}/zookeeper"
+        - "{{ zookeeper_home }}"
+        - "{{ install_root }}/zookeeper-{{ zookeeper_version }}"
+        - "{{ zookeeper_data_dir }}"
+        - "{{ zookeeper_log_dir }}"
+
+    - ansible.builtin.systemd: { daemon_reload: true }

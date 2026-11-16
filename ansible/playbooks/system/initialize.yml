@@ -1,0 +1,5 @@
+---
+- name: Initialise every cluster node (user, hosts file, SSH trust, OS tuning)
+  hosts: cluster
+  roles:
+    - common

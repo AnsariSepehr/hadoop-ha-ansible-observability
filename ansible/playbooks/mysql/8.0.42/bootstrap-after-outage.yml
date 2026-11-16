@@ -1,0 +1,27 @@
+---
+# Use ONLY after ALL MySQL nodes were down at the same time (auto-rejoin needs a running group).
+# Pick the node that has the most recent data (check "SHOW GLOBAL VARIABLES LIKE 'gtid_executed'" on each).
+#   ansible-playbook playbooks/mysql/8.0.42/bootstrap-after-outage.yml -e bootstrap_host=node3
+- name: Make sure mysqld runs everywhere
+  hosts: mysql
+  tasks:
+    - ansible.builtin.systemd: { name: mysqld, state: started }
+
+- name: Bootstrap the group from the chosen node
+  hosts: mysql
+  tasks:
+    - ansible.builtin.assert:
+        that: bootstrap_host is defined and bootstrap_host in groups['mysql']
+        fail_msg: "Pass -e bootstrap_host=<inventory name of the most up-to-date MySQL node>"
+      run_once: true
+    - ansible.builtin.include_role: { name: mysql, tasks_from: gr_bootstrap }
+      vars:
+        mysql_allow_rebootstrap_after_outage: true
+      when: inventory_hostname == bootstrap_host
+
+- name: Rejoin the remaining nodes
+  hosts: mysql
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: gr_join }
+      when: inventory_hostname != bootstrap_host

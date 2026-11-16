@@ -1,0 +1,27 @@
+---
+- name: Guard
+  ansible.builtin.assert:
+    that: confirm_destroy_data | default('no') == 'yes'
+    fail_msg: "This removes Spark. Add: -e confirm_destroy_data=yes"
+
+- name: Stop and disable the History Server
+  ansible.builtin.systemd:
+    name: spark-history-server
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/spark-history-server.service
+    - /etc/profile.d/spark.sh
+    - /etc/tmpfiles.d/spark.conf
+    - "{{ spark_home }}"
+    - "{{ install_root }}/spark-{{ spark_version }}"
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

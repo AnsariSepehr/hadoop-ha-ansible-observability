@@ -1,0 +1,31 @@
+---
+# =============================================================================
+# Apache Zeppelin - user-facing settings.
+# Derived paths (tarball name, install dir, jmx jar...) live in
+# roles/zeppelin/defaults/main.yml. Change the version here AND rename
+# playbooks/zeppelin/<version>/ and offline_packages/zeppelin/zeppelin-<version>/.
+# =============================================================================
+zeppelin_version: "0.12.1"
+
+zeppelin_install_root: /opt
+zeppelin_user: zeppelin
+zeppelin_group: zeppelin
+
+zeppelin_port: 8890              # Web UI (also serves /metrics, Micrometer)
+zeppelin_server_ssl_port: 8443
+zeppelin_jmx_port: 7080          # jmx_prometheus_javaagent scrape port
+
+# JVM memory: Zeppelin server and per-interpreter processes
+zeppelin_mem: "-Xms1024m -Xmx2048m"
+zeppelin_intp_mem: "-Xms512m -Xmx1024m"
+
+# JAVA_HOME for Zeppelin. Empty = auto-detect `java` from PATH (as the original
+# playbook did). Zeppelin 0.12 needs JDK 11+; set this if the default `java`
+# on the host is JDK 8, e.g. the JDK 11 you unpack from offline_packages/java.
+zeppelin_java_home: ""
+
+# --- Firewall / Prometheus -------------------------------------------------------
+# If firewalld is running on the Zeppelin host, the role opens the web port to
+# everyone and the JMX port (7080) only to the Prometheus server below.
+zeppelin_manage_firewall: true
+zeppelin_prometheus_ip: "192.0.2.50"

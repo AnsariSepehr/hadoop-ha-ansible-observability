@@ -1,0 +1,159 @@
+# {{ ansible_managed }}
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  - pattern: 'kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      clientId: "$3"
+      topic: "$4"
+      partition: "$5"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), brokerHost=(.+), brokerPort=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      broker: "$3:$4"
+
+  - pattern: 'kafka.coordinator<type=(.+), name=(.+)><>Value'
+    name: kafka_coordinator_$1_$2
+    type: GAUGE
+
+  - pattern: 'kafka.coordinator<type=(.+), name=(.+), group=(.+)><>Value'
+    name: kafka_coordinator_$1_$2
+    type: GAUGE
+    labels:
+      group: "$3"
+
+  - pattern: 'kafka.(.+)<type=(.+), name=(.+)><>Value'
+    name: kafka_$1_$2_$3
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)PerSec\w*><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)PerSec\w*, topic=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      topic: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)PerSec\w*, clientId=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      clientId: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)PerSec\w*, topic=(.+), partition=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      topic: "$3"
+      partition: "$4"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), quota=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      quota: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), user=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      user: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), client-id=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      client_id: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      topic: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      topic: "$3"
+      partition: "$4"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), clientId=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      clientId: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      clientId: "$3"
+      topic: "$4"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      topic: "$3"
+      partition: "$4"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      topic: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), clientId=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+    labels:
+      clientId: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)><>Count'
+    name: kafka_server_$1_$2_total
+    type: COUNTER
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+)><>MeanRate'
+    name: kafka_server_$1_$2_mean_rate
+    type: GAUGE
+    labels:
+      topic: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)><>MeanRate'
+    name: kafka_server_$1_$2_mean_rate
+    type: GAUGE
+
+  - pattern: 'kafka.server<type=(.+), name=(.+), topic=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      topic: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)Percentile=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      percentile: "$3"
+
+  - pattern: 'kafka.server<type=(.+), name=(.+)Percentile=(.+), topic=(.+)><>Value'
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      percentile: "$3"
+      topic: "$4"

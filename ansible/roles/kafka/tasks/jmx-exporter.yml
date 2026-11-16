@@ -1,0 +1,26 @@
+---
+- name: Create Kafka systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/kafka.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Kafka JMX exporter configuration
+  ansible.builtin.template:
+    src: kafka-jmx.yml.j2
+    dest: "{{ kafka_jmx_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart kafka
+
+- name: Install Kafka JMX exporter systemd drop-in
+  ansible.builtin.template:
+    src: kafka-jmx-exporter.conf.j2
+    dest: /etc/systemd/system/kafka.service.d/jmx-exporter.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart kafka

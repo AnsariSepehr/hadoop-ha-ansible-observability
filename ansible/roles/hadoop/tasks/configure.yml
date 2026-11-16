@@ -1,0 +1,28 @@
+---
+- name: Render Hadoop configuration
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ hadoop_conf_dir }}/{{ item }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+  loop:
+    - core-site.xml
+    - hdfs-site.xml
+    - yarn-site.xml
+    - mapred-site.xml
+    - hadoop-env.sh
+    - workers
+  register: hadoop_conf_result
+
+- name: Render TLS client/server settings
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ hadoop_conf_dir }}/{{ item }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0640"
+  loop:
+    - ssl-server.xml
+    - ssl-client.xml
+  when: hadoop_ssl_enabled | bool

@@ -1,0 +1,11 @@
+---
+- name: MySQL group status and current primary
+  hosts: mysql
+  tasks:
+    - ansible.builtin.include_role: { name: mysql, tasks_from: status }
+      when: mysql_gr_enabled | bool
+    - ansible.builtin.include_role: { name: mysql, tasks_from: discover_primary }
+      when: inventory_hostname == groups['mysql'][0]
+    - ansible.builtin.debug:
+        msg: "PRIMARY = {{ mysql_primary_addr }}"
+      when: inventory_hostname == groups['mysql'][0]

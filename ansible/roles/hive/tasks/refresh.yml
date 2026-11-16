@@ -1,0 +1,14 @@
+---
+- name: Rewrite hive-site.xml with the current MySQL primary
+  ansible.builtin.template:
+    src: hive-site.xml.j2
+    dest: "{{ hive_conf_dir }}/hive-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0640"
+
+- name: Restart Hive
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: [hive-metastore, hive-server2]

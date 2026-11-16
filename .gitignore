@@ -1,0 +1,26 @@
+# local, real values - never commit
+.forbidden-terms
+monitoring/stack/monitoring.env
+*.env
+!*.env.example
+ansible/inventory/group_vars/all/secrets.yml
+ansible/.generated/
+.generated/
+.vault_pass*
+# generated, rebuilt by monitoring/prometheus/gen-targets.py
+monitoring/prometheus/file_sd/
+# credentials and keys
+*.pem
+*.key
+*.p12
+*.jks
+*.jceks
+k8s/
+token
+# working files
+*.orig
+*.bak
+*.swp
+*.retry
+.DS_Store
+screenshots/raw/

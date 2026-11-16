@@ -1,0 +1,53 @@
+---
+# Remaining nodes, one at a time (serial: 1 in the playbook).
+- name: Group Replication prerequisites (SELinux label for the GR port)
+  ansible.builtin.include_tasks: gr_prepare.yml
+
+- name: Write the Group Replication configuration
+  ansible.builtin.template:
+    src: mysql-gr.cnf.j2
+    dest: /etc/my.cnf.d/kadoop-gr.cnf
+    mode: "0644"
+  register: gr_cnf_join
+
+- name: Restart mysqld to load the Group Replication plugin
+  ansible.builtin.systemd:
+    name: mysqld
+    state: restarted
+  when: gr_cnf_join is changed
+
+- name: Wait for the socket after restart
+  ansible.builtin.wait_for:
+    path: "{{ mysql_socket }}"
+    timeout: 120
+  when: gr_cnf_join is changed
+
+- name: Is this node already ONLINE in a group?
+  ansible.builtin.command: >-
+    mysql -Nse "SELECT COUNT(*) FROM performance_schema.replication_group_members WHERE MEMBER_STATE='ONLINE' AND MEMBER_HOST='{{ node_addr }}'"
+  register: gr_self
+  changed_when: false
+  failed_when: false
+
+- name: Join the group
+  ansible.builtin.command:
+    argv:
+      - mysql
+      - -e
+      - "STOP GROUP_REPLICATION; START GROUP_REPLICATION;"
+  when: gr_self.stdout | default('0') | int == 0
+  changed_when: true
+
+- name: Wait until this node is ONLINE
+  ansible.builtin.command: >-
+    mysql -Nse "SELECT MEMBER_STATE FROM performance_schema.replication_group_members WHERE MEMBER_HOST='{{ node_addr }}'"
+  register: gr_state
+  until: gr_state.stdout == 'ONLINE'
+  retries: 36
+  delay: 5
+  changed_when: false
+
+- name: Rejoin the group automatically after a node restart
+  ansible.builtin.command:
+    argv: [mysql, -e, "SET PERSIST group_replication_start_on_boot=ON"]
+  changed_when: true

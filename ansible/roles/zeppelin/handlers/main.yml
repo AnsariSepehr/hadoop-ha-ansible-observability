@@ -1,0 +1,11 @@
+---
+- name: reload systemd and restart zeppelin
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ zeppelin_service_name }}"
+    state: restarted
+
+- name: restart zeppelin
+  ansible.builtin.systemd:
+    name: "{{ zeppelin_service_name }}"
+    state: restarted

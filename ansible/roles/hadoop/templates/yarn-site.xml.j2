@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+{% if yarn_rm_ha | bool %}
+  <property><name>yarn.resourcemanager.ha.enabled</name><value>true</value></property>
+  <property><name>yarn.resourcemanager.ha.rm-ids</name><value>{{ yarn_rm_ids | join(',') }}</value></property>
+  <property><name>yarn.resourcemanager.cluster-id</name><value>{{ cluster_name }}-yarn</value></property>
+  <property><name>yarn.resourcemanager.ha.automatic-failover.enabled</name><value>true</value></property>
+  <property><name>yarn.resourcemanager.ha.automatic-failover.embedded</name><value>true</value></property>
+  <property><name>yarn.resourcemanager.ha.automatic-failover.zk-base-path</name><value>/yarn-leader-election</value></property>
+{% for h in groups['resourcemanagers'] %}
+{% set id = 'rm' ~ loop.index %}
+  <property><name>yarn.resourcemanager.hostname.{{ id }}</name><value>{{ hostvars[h].node_addr }}</value></property>
+  <property><name>yarn.resourcemanager.address.{{ id }}</name><value>{{ hostvars[h].node_addr }}:{{ yarn_rm_port }}</value></property>
+  <property><name>yarn.resourcemanager.scheduler.address.{{ id }}</name><value>{{ hostvars[h].node_addr }}:{{ yarn_rm_scheduler_port }}</value></property>
+  <property><name>yarn.resourcemanager.resource-tracker.address.{{ id }}</name><value>{{ hostvars[h].node_addr }}:{{ yarn_rm_tracker_port }}</value></property>
+  <property><name>yarn.resourcemanager.admin.address.{{ id }}</name><value>{{ hostvars[h].node_addr }}:{{ yarn_rm_admin_port }}</value></property>
+  <property><name>yarn.resourcemanager.webapp.address.{{ id }}</name><value>{{ hostvars[h].node_addr }}:{{ yarn_rm_webapp_port }}</value></property>
+{% endfor %}
+{% else %}
+{% set rm = hostvars[groups['resourcemanagers'][0]].node_addr %}
+  <property><name>yarn.resourcemanager.hostname</name><value>{{ rm }}</value></property>
+  <property><name>yarn.resourcemanager.address</name><value>{{ rm }}:{{ yarn_rm_port }}</value></property>
+  <property><name>yarn.resourcemanager.scheduler.address</name><value>{{ rm }}:{{ yarn_rm_scheduler_port }}</value></property>
+  <property><name>yarn.resourcemanager.resource-tracker.address</name><value>{{ rm }}:{{ yarn_rm_tracker_port }}</value></property>
+  <property><name>yarn.resourcemanager.admin.address</name><value>{{ rm }}:{{ yarn_rm_admin_port }}</value></property>
+  <property><name>yarn.resourcemanager.webapp.address</name><value>{{ rm }}:{{ yarn_rm_webapp_port }}</value></property>
+{% endif %}
+  <!-- keep running applications across a ResourceManager failover -->
+  <property><name>yarn.resourcemanager.zk-address</name><value>{{ zookeeper_connect }}</value></property>
+  <property><name>yarn.resourcemanager.recovery.enabled</name><value>true</value></property>
+  <property><name>yarn.resourcemanager.store.class</name><value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value></property>
+
+  <property><name>yarn.nodemanager.address</name><value>0.0.0.0:{{ yarn_nm_rpc_port }}</value></property>
+  <property><name>yarn.nodemanager.webapp.address</name><value>0.0.0.0:{{ yarn_nm_webapp_port }}</value></property>
+  <property><name>yarn.nodemanager.local-dirs</name><value>{{ yarn_local_dir }}</value></property>
+  <property><name>yarn.nodemanager.log-dirs</name><value>{{ yarn_log_dir }}</value></property>
+  <property><name>yarn.nodemanager.aux-services</name><value>mapreduce_shuffle</value></property>
+  <property><name>yarn.nodemanager.resource.memory-mb</name><value>{{ yarn_nm_memory_mb }}</value></property>
+  <property><name>yarn.scheduler.minimum-allocation-mb</name><value>{{ yarn_sched_min_mb }}</value></property>
+  <property><name>yarn.scheduler.maximum-allocation-mb</name><value>{{ yarn_sched_max_mb }}</value></property>
+  <!-- the virtual-memory check kills healthy JVMs on EL8/EL9 -->
+  <property><name>yarn.nodemanager.vmem-check-enabled</name><value>false</value></property>
+  <property><name>yarn.nodemanager.env-whitelist</name><value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value></property>
+
+  <property><name>yarn.log-aggregation-enable</name><value>true</value></property>
+  <property><name>yarn.log-aggregation.retain-seconds</name><value>604800</value></property>
+{% if history_server_addr %}
+  <property><name>yarn.log.server.url</name><value>http://{{ history_server_addr }}:{{ mapred_history_webapp_port }}/jobhistory/logs</value></property>
+{% endif %}
+</configuration>

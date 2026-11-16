@@ -1,0 +1,45 @@
+---
+# =============================================================================
+#  نسخه‌ها و مسیر بسته‌های آفلاین
+#  ساختار:  offline_packages/<software>/<software>-<version>/<file>
+#  برای نسخه‌ی جدید: پوشه‌ی نسخه را بسازید، فایل را بگذارید و فقط *_version را عوض کنید.
+# =============================================================================
+hadoop_version: "3.3.6"
+zookeeper_version: "3.8.4"
+hive_version: "3.1.3"
+hive_schema_version: "3.1.0"
+spark_version: "3.5.4"
+spark_hadoop_profile: "3"           # -> spark-<ver>-bin-hadoop3.tgz
+kafka_version: "4.0.0"
+kafka_scala_version: "2.13"
+mysql_version: "8.0.42"
+mysql_connector_version: "8.0.28"
+jmx_exporter_version: "1.1.0"
+
+hadoop_package: "{{ offline_dir }}/hadoop/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
+zookeeper_package: "{{ offline_dir }}/zookeeper/zookeeper-{{ zookeeper_version }}/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+hive_package: "{{ offline_dir }}/hive/hive-{{ hive_version }}/apache-hive-{{ hive_version }}-bin.tar.gz"
+spark_package: "{{ offline_dir }}/spark/spark-{{ spark_version }}/spark-{{ spark_version }}-bin-hadoop{{ spark_hadoop_profile }}.tgz"
+kafka_package: "{{ offline_dir }}/kafka/kafka-{{ kafka_version }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+mysql_rpm_dir: "{{ offline_dir }}/mysql/mysql-server-{{ mysql_version }}"          # همه‌ی *.rpm داخل پوشه نصب می‌شوند
+mysql_connector_package: "{{ offline_dir }}/mysql/mysql-connector-j-{{ mysql_connector_version }}/mysql-connector-java-{{ mysql_connector_version }}.jar"
+jmx_exporter_package: "{{ offline_dir }}/monitoring/jmx-exporter-{{ jmx_exporter_version }}/jmx_prometheus_javaagent-{{ jmx_exporter_version }}.jar"
+
+# ---- کاتالوگ Java ------------------------------------------------------------------
+# type=tarball : استخراج در install_root و لینک java_link
+# type=rpm     : نصب همه‌ی *.rpm پوشه با dnf (بدون ریپازیتوری)
+java_catalog:
+  "8":
+    type: tarball
+    package: "{{ offline_dir }}/java/openjdk-8u492-b09/OpenJDK8U-jdk_x64_linux_hotspot_8u492b09.tar.gz"
+    dir_name: openjdk-8u492-b09
+    home: "{{ install_root }}/java8"
+  "11":
+    type: tarball
+    package: "{{ offline_dir }}/java/openjdk-11/jdk11.tar.gz"
+    dir_name: openjdk-11
+    home: "{{ install_root }}/java11"
+  "17":
+    type: rpm
+    rpm_dir: "{{ offline_dir }}/java/openjdk-17.0.20.1.1"
+    home: /usr/lib/jvm/java-17-openjdk

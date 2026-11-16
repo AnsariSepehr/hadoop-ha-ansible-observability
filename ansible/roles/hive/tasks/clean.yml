@@ -1,0 +1,29 @@
+---
+- name: Guard
+  ansible.builtin.assert:
+    that: confirm_destroy_data | default('no') == 'yes'
+    fail_msg: "This removes Hive. Add: -e confirm_destroy_data=yes"
+
+- name: Stop and disable
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: [hive-server2, hive-metastore]
+  failed_when: false
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/hive-server2.service
+    - /etc/systemd/system/hive-metastore.service
+    - /etc/profile.d/hive.sh
+    - "{{ hive_home }}"
+    - "{{ install_root }}/hive-{{ hive_version }}"
+    - "{{ hive_scratch_dir }}"
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

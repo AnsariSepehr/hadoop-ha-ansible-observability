@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: java
+    java_version: "{{ zookeeper_java_version }}"

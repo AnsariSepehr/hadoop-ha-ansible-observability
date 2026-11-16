@@ -1,0 +1,4 @@
+---
+- name: Start JournalNode
+  ansible.builtin.include_tasks: service.yml
+  vars: { svc: journalnode, svc_port: "{{ hdfs_jn_rpc_port }}" }

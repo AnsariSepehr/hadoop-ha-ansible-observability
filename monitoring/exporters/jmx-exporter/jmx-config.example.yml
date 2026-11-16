@@ -1,0 +1,14 @@
+# Example of narrower JMX rules. The shipped default is the catch-all ".*".
+# Metric names below are illustrative; confirm real bean names with:
+#   curl -s http://<NODE_IP>:<JMX_PORT>/metrics | grep -i <keyword>
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+rules:
+  # Hadoop NameNode: pass through the FSNamesystem bean with a clean prefix
+  - pattern: 'Hadoop<service=NameNode, name=FSNamesystem><>(\w+)'
+    name: hadoop_namenode_fsnamesystem_$1
+  # JVM memory and GC are always useful
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>(\w+)'
+    name: jvm_heap_memory_$1
+  # Everything else: keep, so nothing is lost
+  - pattern: ".*"

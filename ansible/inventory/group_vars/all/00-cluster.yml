@@ -1,0 +1,43 @@
+---
+# =============================================================================
+#  تنظیمات عمومی کلاستر
+# =============================================================================
+cluster_name: kadoop
+
+# آدرس‌دهی بین سرویس‌ها:
+#   ip       -> در همه‌ی کانفیگ‌ها IP (ansible_host) نوشته می‌شود (وابستگی به DNS ندارد)
+#   hostname -> نام inventory نوشته می‌شود (با manage_etc_hosts یا DNS باید resolve شود)
+address_mode: ip
+
+manage_etc_hosts: true       # افزودن نام‌ها به /etc/hosts همه‌ی نودها
+manage_firewall: false       # باز کردن پورت‌های لازم در firewalld (اگر فعال باشد)
+manage_os_tuning: true       # limits و sysctl بهینه برای Hadoop/Kafka/MySQL
+ntp_check: true              # هشدار در صورت غیرفعال بودن chronyd/ntpd
+
+# ---- کاربر سرویس‌ها --------------------------------------------------------------
+hadoop_user: hadoop
+hadoop_group: hadoop
+hadoop_user_home: "/home/{{ hadoop_user }}"
+
+# ---- ریشه‌ی مسیرها ---------------------------------------------------------------
+install_root: /opt           # نرم‌افزارها: /opt/<name>-<version> + لینک /opt/<name>
+data_root: /data             # داده‌ها
+log_root: /var/log
+run_root: /var/run
+
+# ---- مسیرهای روی Control Node -----------------------------------------------------
+offline_dir: "{{ inventory_dir }}/../offline_packages"
+generated_dir: "{{ inventory_dir }}/../.generated"
+
+# ---- Java --------------------------------------------------------------------------
+java_default_version: "8"        # جاوای Hadoop/ZooKeeper/Hive/Spark
+hadoop_java_version: "{{ java_default_version }}"
+zookeeper_java_version: "{{ java_default_version }}"
+hive_java_version: "8"           # Hive 3.1.x روی Java 8 پشتیبانی می‌شود
+spark_java_version: "{{ java_default_version }}"
+kafka_java_version: "17"         # Kafka 4.x نیازمند Java 17
+
+# ---- قابلیت‌های اختیاری ----------------------------------------------------------
+jmx_exporter_enabled: true       # صدور متریک‌ها برای Prometheus
+hadoop_ssl_enabled: true         # Enable HTTPS for HDFS web UIs during site.yml
+hadoop_ssl_mode: selfsigned      # selfsigned | custom; self-signed certs are for internal/test use

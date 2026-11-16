@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Group Replication runtime options. Written only after --initialize has finished.
+[mysqld]
+plugin_load_add='group_replication.so'
+group_replication_group_name="{{ mysql_gr_group_name }}"
+group_replication_start_on_boot=off
+group_replication_local_address="{{ node_addr }}:{{ mysql_gr_port }}"
+group_replication_group_seeds="{{ mysql_gr_seeds }}"
+group_replication_bootstrap_group=off
+group_replication_ip_allowlist="{{ mysql_gr_allowlist }}"
+group_replication_single_primary_mode=ON
+group_replication_enforce_update_everywhere_checks=OFF
+# Incremental distributed recovery (the clone path was unstable on some 8.0.4x builds)
+group_replication_clone_threshold=9223372036854775807
+group_replication_recovery_get_public_key=ON

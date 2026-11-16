@@ -1,0 +1,41 @@
+---
+- name: Hadoop daemons per node
+  hosts: namenodes:journalnodes:datanodes:nodemanagers:resourcemanagers:history_servers
+  tasks:
+    - name: Unit states
+      ansible.builtin.command: "systemctl is-active hadoop-{{ item.name }}"
+      loop: "{{ hadoop_units | selectattr('group', 'in', group_names) | list }}"
+      loop_control: { label: "{{ item.name }}" }
+      register: unit_state
+      changed_when: false
+      failed_when: false
+
+    - name: Show state (with a fallback for orphaned JVMs)
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}:
+          {{ unit_state.results
+             | map(attribute='item.name')
+             | zip(unit_state.results
+                   | map(attribute='stdout')
+                   | map('regex_replace', '^$', 'unknown'))
+             | map('join', '=')
+             | join('  ') }}
+
+- name: Cluster-level state
+  hosts: namenodes[0]
+  tasks:
+    - name: HA state and capacity
+      ansible.builtin.shell: |
+        for id in {{ hdfs_nn_ids | join(' ') }}; do echo -n "$id: "; {{ hadoop_home }}/bin/hdfs haadmin -getServiceState $id 2>&1; done
+        {{ hadoop_home }}/bin/hdfs dfsadmin -report 2>/dev/null | sed -n '1,12p'
+        {{ hadoop_home }}/bin/yarn node -list 2>/dev/null | tail -n +2
+      environment: "{{ hadoop_env }}"
+      become: true
+      become_user: "{{ hadoop_user }}"
+      register: hadoop_state
+      changed_when: false
+      failed_when: false
+
+    - ansible.builtin.debug:
+        var: hadoop_state.stdout_lines

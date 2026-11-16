@@ -1,0 +1,5 @@
+---
+- name: Stop Hive
+  hosts: hive_servers
+  tasks:
+    - ansible.builtin.include_role: { name: hive, tasks_from: stop }

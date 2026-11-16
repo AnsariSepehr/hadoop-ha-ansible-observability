@@ -1,0 +1,47 @@
+---
+# Reference playbook (unverified): install node_exporter from an offline tarball on all cluster nodes.
+- name: Install node_exporter (offline)
+  hosts: cluster
+  become: true
+  vars:
+    node_exporter_version: "CHANGE_ME"
+    node_exporter_tarball: "CHANGE_ME"     # path on the control node
+  tasks:
+    - name: Create service user
+      ansible.builtin.user:
+        name: node_exporter
+        system: true
+        shell: /sbin/nologin
+        create_home: false
+
+    - name: Unpack tarball
+      ansible.builtin.unarchive:
+        src: "{{ playbook_dir }}/../../../ansible/{{ node_exporter_tarball }}"
+        dest: /opt
+        creates: "/opt/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+
+    - name: Stable link
+      ansible.builtin.file:
+        src: "/opt/node_exporter-{{ node_exporter_version }}.linux-amd64"
+        dest: /opt/node_exporter
+        state: link
+
+    - name: Install systemd unit
+      ansible.builtin.copy:
+        src: node_exporter.service
+        dest: /etc/systemd/system/node_exporter.service
+        mode: "0644"
+      notify: restart node_exporter
+
+    - name: Enable and start
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: restart node_exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        state: restarted

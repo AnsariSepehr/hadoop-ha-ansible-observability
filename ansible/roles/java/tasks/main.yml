@@ -1,0 +1,26 @@
+---
+- name: Resolve catalog entry
+  ansible.builtin.set_fact:
+    java_cfg: "{{ java_catalog[java_version | string] }}"
+
+- name: Is this JDK already installed?
+  ansible.builtin.stat:
+    path: "{{ java_cfg.home }}/bin/java"
+  register: java_present
+
+- name: Install JDK from tarball
+  ansible.builtin.include_tasks: tarball.yml
+  when: java_cfg.type == 'tarball' and not java_present.stat.exists
+
+- name: Install JDK from RPM files
+  ansible.builtin.include_tasks: rpm.yml
+  when: java_cfg.type == 'rpm' and not java_present.stat.exists
+
+- name: Verify the JDK runs
+  ansible.builtin.command: "{{ java_cfg.home }}/bin/java -version"
+  register: java_check
+  changed_when: false
+
+- name: Show Java version
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: {{ java_check.stderr_lines | first }}"

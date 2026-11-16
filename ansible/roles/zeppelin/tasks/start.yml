@@ -1,0 +1,12 @@
+---
+- name: Start the zeppelin service
+  ansible.builtin.systemd:
+    name: "{{ zeppelin_service_name }}"
+    state: started
+    enabled: true
+
+- name: Wait for the Zeppelin web port
+  ansible.builtin.wait_for:
+    port: "{{ zeppelin_port }}"
+    host: 127.0.0.1
+    timeout: 180

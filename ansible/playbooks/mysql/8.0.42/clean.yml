@@ -1,0 +1,26 @@
+---
+- name: Remove MySQL (destroys the metastore data)
+  hosts: mysql
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "Add -e confirm_destroy_data=yes"
+
+    - ansible.builtin.systemd: { name: mysqld, state: stopped, enabled: false }
+      failed_when: false
+
+    - name: Kill mysqld
+      ansible.builtin.shell: |
+        set +e
+        pkill -9 -x mysqld 2>/dev/null
+        pkill -9 -x mysqld_safe 2>/dev/null
+        sleep 2
+        exit 0
+      changed_when: true
+
+    - name: Remove packages, data and configuration
+      ansible.builtin.shell: |
+        dnf remove -y --disablerepo='*' 'mysql-community-*' mysql-selinux 2>&1 | tail -3
+        rm -rf {{ mysql_data_dir }}/* {{ mysql_error_log }} /etc/my.cnf /etc/my.cnf.d/kadoop-*.cnf /root/.my.cnf /tmp/kadoop-mysql
+        exit 0
+      changed_when: true

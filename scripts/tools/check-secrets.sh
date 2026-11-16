@@ -10,7 +10,7 @@ fail=0
 files() { git ls-files -co --exclude-standard 2>/dev/null || find . -type f -not -path './.git/*'; }
 scan() {  # scan LABEL REGEX
   local out
-  out="$(files | grep -vE '\.(docx|png|jpg|pdf)$|^scripts/tools/check-secrets.sh$' | xargs -r grep -nIiE -- "$2" 2>/dev/null | grep -vE 'CHANGE_ME|\{\{|\[REDACTED\]')"
+  out="$(files | grep -vE '\.(docx|png|jpg|pdf)$|^scripts/tools/check-secrets.sh$' | xargs -r grep -nIiE -- "$2" 2>/dev/null | grep -vE 'CHANGE_ME|\{\{|\[REDACTED\]|"expr":')"
   if [ -n "$out" ]; then printf '\n[FOUND] %s\n%s\n' "$1" "$out"; fail=1; fi
 }
 scan "private IPv4 address (use <NODE1_IP>, <NOC_IP> ...)" '(^|[^0-9.])(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}'

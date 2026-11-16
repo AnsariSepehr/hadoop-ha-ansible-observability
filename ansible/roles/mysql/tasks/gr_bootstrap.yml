@@ -1,0 +1,132 @@
+---
+# First node only: creates the group.
+- name: Check whether this node has previously been configured for Group Replication
+  ansible.builtin.stat:
+    path: /etc/my.cnf.d/kadoop-gr.cnf
+  register: gr_config_preexisting
+
+- name: Group Replication prerequisites (SELinux label for the GR port)
+  ansible.builtin.include_tasks: gr_prepare.yml
+
+- name: Write the Group Replication configuration
+  ansible.builtin.template:
+    src: mysql-gr.cnf.j2
+    dest: /etc/my.cnf.d/kadoop-gr.cnf
+    mode: "0644"
+  register: gr_cnf_bootstrap
+
+- name: Restart mysqld to load the Group Replication plugin
+  ansible.builtin.systemd:
+    name: mysqld
+    state: restarted
+  when: gr_cnf_bootstrap is changed
+
+- name: Wait for the socket after restart
+  ansible.builtin.wait_for:
+    path: "{{ mysql_socket }}"
+    timeout: 120
+  when: gr_cnf_bootstrap is changed
+
+- name: Is this node already ONLINE in a group?
+  ansible.builtin.command: >-
+    mysql -Nse "SELECT COUNT(*) FROM performance_schema.replication_group_members WHERE MEMBER_STATE='ONLINE' AND MEMBER_HOST='{{ node_addr }}'"
+  register: gr_online
+  changed_when: false
+  failed_when: false
+
+- name: Is any member of the existing group ONLINE?
+  ansible.builtin.command: >-
+    mysql -Nse "SELECT COUNT(*) FROM performance_schema.replication_group_members WHERE MEMBER_STATE='ONLINE'"
+  register: gr_cluster_online
+  changed_when: false
+  failed_when: false
+
+- name: Refuse implicit re-bootstrap of an existing MySQL Group Replication node
+  ansible.builtin.assert:
+    that:
+      - not gr_config_preexisting.stat.exists or (mysql_allow_rebootstrap_after_outage | default(false) | bool)
+    fail_msg: >-
+      Group Replication is configured on {{ inventory_hostname }} but no member is ONLINE.
+      The normal install playbook will not silently bootstrap a new group or discard GTID history.
+      Verify GTID_EXECUTED on every member, choose the most up-to-date node, then run
+      playbooks/mysql/8.0.42/bootstrap-after-outage.yml with -e bootstrap_host=<inventory-host>.
+  when:
+    - gr_online.stdout | default('0') | int == 0
+    - gr_cluster_online.stdout | default('0') | int == 0
+
+- name: Rejoin the existing group if another member is already ONLINE
+  when:
+    - gr_online.stdout | default('0') | int == 0
+    - gr_cluster_online.stdout | default('0') | int > 0
+  block:
+    - name: Start Group Replication on this node without resetting GTIDs
+      ansible.builtin.command:
+        argv: [mysql, -e, "STOP GROUP_REPLICATION; START GROUP_REPLICATION;"]
+      changed_when: true
+
+    - name: Wait until this node rejoins the existing group
+      ansible.builtin.command: >-
+        mysql -Nse "SELECT MEMBER_STATE FROM performance_schema.replication_group_members WHERE MEMBER_HOST='{{ node_addr }}'"
+      register: gr_rejoin_state
+      until: gr_rejoin_state.stdout == 'ONLINE'
+      retries: 36
+      delay: 5
+      changed_when: false
+
+- name: Bootstrap a new group only when no member is ONLINE
+  when:
+    - gr_online.stdout | default('0') | int == 0
+    - gr_cluster_online.stdout | default('0') | int == 0
+  block:
+    - name: Bootstrap the group
+      ansible.builtin.command:
+        argv:
+          - mysql
+          - -e
+          - >-
+            STOP GROUP_REPLICATION;
+            SET GLOBAL group_replication_bootstrap_group=ON;
+            START GROUP_REPLICATION;
+            SET GLOBAL group_replication_bootstrap_group=OFF;
+      changed_when: true
+
+    - name: Wait until this node is ONLINE
+      ansible.builtin.command: >-
+        mysql -Nse "SELECT MEMBER_STATE FROM performance_schema.replication_group_members WHERE MEMBER_HOST='{{ node_addr }}'"
+      register: gr_state
+      until: gr_state.stdout == 'ONLINE'
+      retries: 20
+      delay: 5
+      changed_when: false
+
+  rescue:
+    - name: Never leave bootstrap mode switched on after a failed attempt
+      ansible.builtin.command: mysql -e "SET GLOBAL group_replication_bootstrap_group=OFF"
+      changed_when: false
+      failed_when: false
+
+    - name: Collect the real reason (mysqld log and SELinux denials)
+      ansible.builtin.shell: |
+        echo "--- Group Replication / GCS / error lines in {{ mysql_error_log }} ---"
+        grep -E 'group_replication|GCS|\[ERROR\]' {{ mysql_error_log }} 2>/dev/null | tail -n 40
+        echo "--- recent SELinux denials for mysqld ---"
+        (ausearch -m AVC,USER_AVC -ts recent -c mysqld 2>/dev/null || grep -i 'denied.*mysqld' /var/log/audit/audit.log 2>/dev/null) | tail -n 10
+        exit 0
+      register: gr_boot_diag
+      changed_when: false
+      failed_when: false
+
+    - name: Print the diagnostics
+      ansible.builtin.debug:
+        var: gr_boot_diag.stdout_lines
+
+    - name: Fail with the real reason
+      ansible.builtin.fail:
+        msg: >-
+          Group Replication bootstrap failed on {{ inventory_hostname }}:
+          {{ (ansible_failed_result.stderr | default('')) or (ansible_failed_result.msg | default('see the diagnostics above')) }}
+
+- name: Rejoin the group automatically after a node restart
+  ansible.builtin.command:
+    argv: [mysql, -e, "SET PERSIST group_replication_start_on_boot=ON"]
+  changed_when: true

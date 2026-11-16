@@ -1,0 +1,6 @@
+---
+- name: Start ZooKeeper
+  hosts: zookeepers
+  serial: 1
+  tasks:
+    - ansible.builtin.include_role: { name: zookeeper, tasks_from: start }

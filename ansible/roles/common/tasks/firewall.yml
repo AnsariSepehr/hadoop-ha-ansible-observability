@@ -1,0 +1,15 @@
+---
+- name: Is firewalld running?
+  ansible.builtin.command: firewall-cmd --state
+  register: fw_state
+  changed_when: false
+  failed_when: false
+
+- name: Open the ports needed by this node's roles
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ item }}/tcp"
+  register: fw_add
+  changed_when: "'ALREADY_ENABLED' not in fw_add.stderr and 'ALREADY_ENABLED' not in fw_add.stdout"
+  loop: "{{ (firewall_ports_by_group | dict2items | selectattr('key', 'in', group_names) | map(attribute='value') | flatten
+            + (jmx_ports.values() | list if jmx_exporter_enabled | bool else [])) | unique | list }}"
+  when: fw_state.rc == 0
+  notify: Reload firewalld

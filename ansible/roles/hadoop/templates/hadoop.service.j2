@@ -1,0 +1,34 @@
+[Unit]
+Description={{ item.desc }}
+After=network-online.target
+Wants=network-online.target
+{% if item.after is defined %}
+After={{ item.after }}
+{% endif %}
+
+[Service]
+Type=simple
+User={{ hadoop_user }}
+Group={{ hadoop_group }}
+Environment=JAVA_HOME={{ hadoop_java_home }}
+Environment=HADOOP_HOME={{ hadoop_home }}
+Environment=HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+Environment=HADOOP_LOG_DIR={{ hadoop_log_dir }}
+Environment=HADOOP_PID_DIR={{ hadoop_pid_dir }}
+Environment=HOME={{ hadoop_user_home }}
+{% if jmx_exporter_enabled | bool %}
+Environment={{ item.opts }}=-javaagent:{{ jmx_dir }}/{{ jmx_jar }}={{ jmx_ports[item.name] }}:{{ jmx_config }}
+{% endif %}
+ExecStart={{ hadoop_home }}/bin/{{ item.bin }} {{ item.name }}
+KillSignal=SIGTERM
+KillMode=control-group
+Restart=no
+# A JVM stopped by systemd exits with 143 (SIGTERM handled); that is a clean stop, not a failure.
+SuccessExitStatus=143
+TimeoutStartSec=180
+TimeoutStopSec=120
+LimitNOFILE={{ common_limits_nofile | default(65536) }}
+LimitNPROC={{ common_limits_nproc | default(65536) }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Offline checks for the whole repository. Run before every commit; CI runs the same file.
 set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit 1
 fail=0; step() { printf '\n== %s\n' "$1"; }; bad() { echo "FAIL: $1"; fail=1; }
 
 step "shell syntax"

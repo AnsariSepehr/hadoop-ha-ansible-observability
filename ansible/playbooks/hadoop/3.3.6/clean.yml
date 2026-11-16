@@ -1,0 +1,46 @@
+---
+- name: Remove Hadoop
+  hosts: namenodes:journalnodes:datanodes:nodemanagers:resourcemanagers:history_servers:hive_servers:spark_clients
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "This deletes all HDFS/YARN data. Add -e confirm_destroy_data=yes"
+      run_once: true
+
+    - name: Stop systemd units
+      ansible.builtin.systemd:
+        name: "hadoop-{{ item.name }}"
+        state: stopped
+        enabled: false
+      loop: "{{ hadoop_units | reverse | list }}"
+      when: item.group in group_names
+      failed_when: false
+
+    - name: Kill hadoop JVMs by PID
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kill_java
+      vars:
+        kill_java_label: "hadoop daemons"
+        kill_java_patterns:
+          - 'org[.]apache[.]hadoop[.]hdfs[.]server[.]namenode[.]NameNode'
+          - 'org[.]apache[.]hadoop[.]hdfs[.]server[.]datanode[.]DataNode'
+          - 'org[.]apache[.]hadoop[.]hdfs[.]qjournal[.]server[.]JournalNode'
+          - 'org[.]apache[.]hadoop[.]hdfs[.]tools[.]DFSZKFailoverController'
+          - 'org[.]apache[.]hadoop[.]yarn[.]server[.]resourcemanager[.]ResourceManager'
+          - 'org[.]apache[.]hadoop[.]yarn[.]server[.]nodemanager[.]NodeManager'
+          - 'org[.]apache[.]hadoop[.]mapreduce[.]v2[.]hs[.]JobHistoryServer'
+
+    - ansible.builtin.shell: |
+        for u in /etc/systemd/system/hadoop-*.service; do
+          [ -e "$u" ] && systemctl disable "$(basename $u)" 2>/dev/null
+          rm -f "$u"
+        done
+        rm -rf {{ hadoop_home }} {{ install_root }}/hadoop-{{ hadoop_version }} \
+               {{ data_root }}/hadoop {{ data_root }}/yarn \
+               {{ hadoop_log_dir }} {{ hadoop_pid_dir }} \
+               "{{ yarn_node_attribute_store_dir | default('/tmp/hadoop-yarn-hadoop') }}" \
+               /etc/profile.d/hadoop.sh /etc/tmpfiles.d/hadoop.conf \
+               /etc/tmpfiles.d/hadoop-yarn-node-attributes.conf
+        systemctl daemon-reload
+      changed_when: true

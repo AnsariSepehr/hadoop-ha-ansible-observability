@@ -1,0 +1,14 @@
+---
+# Installs binaries + configuration + systemd units on every node that has a Hadoop role or needs the client (Hive/Spark).
+- name: Hadoop 3.3.6 - install and configure
+  hosts: namenodes:journalnodes:datanodes:nodemanagers:resourcemanagers:history_servers:hive_servers:spark_clients
+  vars:
+    expected_version: "3.3.6"
+  pre_tasks:
+    - name: This directory targets one version only
+      ansible.builtin.assert:
+        that: hadoop_version == expected_version
+        fail_msg: "hadoop_version={{ hadoop_version }} but this playbook directory is for {{ expected_version }}. Copy it to playbooks/hadoop/<new-version>/ for another version."
+      run_once: true
+  roles:
+    - hadoop

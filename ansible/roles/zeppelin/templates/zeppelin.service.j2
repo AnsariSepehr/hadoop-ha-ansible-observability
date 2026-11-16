@@ -1,0 +1,16 @@
+[Unit]
+Description=Apache Zeppelin
+After=network.target
+
+[Service]
+Type=simple
+User={{ zeppelin_user }}
+Group={{ zeppelin_group }}
+WorkingDirectory={{ zeppelin_home }}
+ExecStart={{ zeppelin_home }}/bin/zeppelin.sh
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

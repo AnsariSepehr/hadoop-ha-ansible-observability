@@ -1,0 +1,29 @@
+---
+- name: Remove Spark
+  hosts: spark_clients
+  tasks:
+    - ansible.builtin.assert:
+        that: confirm_destroy_data | default('no') == 'yes'
+        fail_msg: "Add -e confirm_destroy_data=yes"
+
+    - ansible.builtin.systemd: { name: spark-history-server, state: stopped, enabled: false }
+      failed_when: false
+
+    - name: Kill Spark JVMs
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kill_java
+      vars:
+        kill_java_label: "spark"
+        kill_java_patterns:
+          - 'org[.]apache[.]spark[.]deploy[.]history[.]HistoryServer'
+
+    - ansible.builtin.file: { path: "{{ item }}", state: absent }
+      loop:
+        - /etc/systemd/system/spark-history-server.service
+        - /etc/profile.d/spark.sh
+        - /etc/tmpfiles.d/spark.conf
+        - "{{ spark_home }}"
+        - "{{ install_root }}/spark-{{ spark_version }}"
+
+    - ansible.builtin.systemd: { daemon_reload: true }

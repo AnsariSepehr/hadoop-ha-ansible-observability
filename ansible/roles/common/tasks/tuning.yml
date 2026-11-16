@@ -1,0 +1,22 @@
+---
+- name: Raise open-file / process limits
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/90-kadoop.conf
+    mode: "0644"
+    content: |
+      # Managed by Ansible (kadoop)
+      * soft nofile {{ common_limits_nofile }}
+      * hard nofile {{ common_limits_nofile }}
+      * soft nproc  {{ common_limits_nproc }}
+      * hard nproc  {{ common_limits_nproc }}
+
+- name: Kernel parameters
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-kadoop.conf
+    mode: "0644"
+    content: |
+      # Managed by Ansible (kadoop)
+      {% for k, v in common_sysctl.items() %}
+      {{ k }} = {{ v }}
+      {% endfor %}
+  notify: Apply sysctl settings

@@ -1,0 +1,36 @@
+---
+- name: Collect RPM files on the control node
+  ansible.builtin.set_fact:
+    java_rpm_files: "{{ lookup('ansible.builtin.fileglob', java_cfg.rpm_dir ~ '/*.rpm', wantlist=True) }}"
+
+- name: Fail if no RPM files were found
+  ansible.builtin.fail:
+    msg: "No *.rpm files in {{ java_cfg.rpm_dir }}"
+  when: java_rpm_files | length == 0
+
+- name: Create the RPM staging directory
+  ansible.builtin.file:
+    path: "/tmp/kadoop-java{{ java_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Stage RPMs on the node
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/tmp/kadoop-java{{ java_version }}/{{ item | basename }}"
+    mode: "0644"
+  loop: "{{ java_rpm_files }}"
+
+- name: Install RPMs without any repository (air-gapped)
+  ansible.builtin.dnf:
+    name: "{{ java_rpm_files | map('basename') | map('regex_replace', '^', '/tmp/kadoop-java' ~ java_version ~ '/') | list }}"
+    state: present
+    disablerepo: "*"
+    disable_gpg_check: true
+
+- name: Remove staged RPMs
+  ansible.builtin.file:
+    path: "/tmp/kadoop-java{{ java_version }}"
+    state: absent

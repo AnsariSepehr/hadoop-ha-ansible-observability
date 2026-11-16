@@ -1,0 +1,4 @@
+---
+mysql_force_reinit: false
+mysql_buffer_pool_size: "{{ [(ansible_memtotal_mb | int * 25 // 100), 256] | max }}M"
+mysql_max_connections: 500

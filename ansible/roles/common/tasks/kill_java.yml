@@ -1,0 +1,22 @@
+---
+- name: "{{ kill_java_label }} - find matching JVMs"
+  ansible.builtin.shell: |
+    set +e
+    for pat in {{ kill_java_patterns | map('quote') | join(' ') }}; do
+      pgrep -u {{ kill_java_user | default('hadoop') }} -f "$pat"
+    done | sort -u
+  register: kill_java_pids
+  changed_when: false
+  failed_when: false
+
+- name: "{{ kill_java_label }} - kill by PID"
+  when: kill_java_pids.stdout_lines | length > 0
+  ansible.builtin.shell: |
+    set +e
+    for pid in {{ kill_java_pids.stdout_lines | join(' ') }}; do
+      comm=$(ps -o comm= -p "$pid" 2>/dev/null)
+      [ "$comm" = "java" ] && kill -9 "$pid"
+    done
+    sleep 2
+    exit 0
+  changed_when: true

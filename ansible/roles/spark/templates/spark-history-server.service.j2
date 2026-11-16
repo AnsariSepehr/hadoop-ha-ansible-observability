@@ -1,0 +1,29 @@
+[Unit]
+Description=Spark History Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ hadoop_user }}
+Group={{ hadoop_group }}
+Environment="JAVA_HOME={{ spark_java_home }}"
+Environment="HADOOP_CONF_DIR={{ hadoop_conf_dir }}"
+Environment="SPARK_HOME={{ spark_home }}"
+Environment="SPARK_LOG_DIR={{ spark_home }}/logs"
+
+# Run the JVM directly. This prevents the Spark shell script from forking/hiding the process.
+ExecStart={{ spark_java_home }}/bin/java \
+  -cp {{ spark_home }}/conf/:{{ spark_home }}/jars/*:{{ hadoop_conf_dir }}/ \
+  -javaagent:{{ jmx_dir }}/{{ jmx_jar }}={{ jmx_ports.spark_history }}:{{ jmx_config }} \
+  -Dspark.history.ui.port={{ spark_history_port }} \
+  -Dspark.history.fs.logDirectory=hdfs:///spark-logs \
+  -Xmx1g \
+  org.apache.spark.deploy.history.HistoryServer
+
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

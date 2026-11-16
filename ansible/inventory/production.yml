@@ -1,0 +1,73 @@
+---
+# =============================================================================
+#  Inventory اصلی کلاستر
+# -----------------------------------------------------------------------------
+#  * هر ماشین فقط «یک‌بار» در بخش hosts تعریف می‌شود (نام + IP).
+#  * نقش هر ماشین با عضویت در گروه‌ها (children) مشخص می‌شود؛
+#    یک ماشین می‌تواند عضو چند گروه باشد (مثلاً NameNode + ZooKeeper + Kafka).
+#  * برای کلاستر دیگر فقط همین فایل (و در صورت نیاز group_vars) را ویرایش کنید.
+#  * گروه‌های اختیاری (mysql, hive_servers, spark_*, kafka_brokers) را اگر نمی‌خواهید
+#    نصب شوند خالی بگذارید: `hosts: {}`
+# =============================================================================
+all:
+  hosts:
+    localhost:                      # ماشین کنترل (Control Node) – حذف نشود
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    node1: { ansible_host: 192.0.2.11 }
+    node2: { ansible_host: 192.0.2.12 }
+    node3: { ansible_host: 192.0.2.13 }
+    node4: { ansible_host: 192.0.2.14 }
+    node5: { ansible_host: 192.0.2.15 }
+
+  children:
+    # ---- HDFS / YARN -------------------------------------------------------
+    namenodes:                      # دقیقاً ۲ عدد (Active/Standby) + ZKFC
+      hosts: { node1: {}, node2: {} }
+    journalnodes:                   # تعداد فرد، حداقل ۳
+      hosts: { node1: {}, node2: {}, node3: {} }
+    zookeepers:                     # تعداد فرد، حداقل ۳
+      hosts: { node1: {}, node2: {}, node3: {} }
+    datanodes:                      # DataNode ها
+      hosts: { node1: {}, node2: {}, node3: {}, node4: {}, node5: {} }
+    nodemanagers:                   # NodeManager ها (معمولاً همان datanodes)
+      hosts: { node1: {}, node2: {}, node3: {}, node4: {}, node5: {} }
+    resourcemanagers:               # ۱ یا ۲ عدد (برای HA دو عدد)
+      hosts: { node1: {}, node2: {} }
+    history_servers:                # MapReduce JobHistory (یک عدد)
+      hosts: { node1: {} }
+
+    # ---- MySQL (Metastore Hive) ------------------------------------------
+    mysql:                          # Group Replication؛ ۳ عدد (یا ۱ برای تک‌نود)
+      hosts: { node3: {}, node4: {}, node5: {} }
+
+    # ---- Hive / Spark ---------------------------------------------------------
+    hive_servers:                   # Metastore + HiveServer2
+      hosts: { node1: {} }
+    spark_clients:                  # نودهایی که Spark روی آن‌ها نصب می‌شود
+      hosts: { node1: {}, node2: {} }
+    spark_history_servers:          # Spark History Server (یک عدد، زیرمجموعه‌ی spark_clients)
+      hosts: { node1: {} }
+
+    # ---- Kafka (KRaft) ----------------------------------------------------------
+    kafka_brokers:                  # هر Broker هم Controller است؛ حداقل ۳ عدد
+      hosts: { node1: {}, node2: {}, node3: {} }
+
+    # ---- گروه والد: همه‌ی ماشین‌های خوشه ---------------------------------
+    cluster:
+      children:
+        namenodes: {}
+        journalnodes: {}
+        zookeepers: {}
+        datanodes: {}
+        nodemanagers: {}
+        resourcemanagers: {}
+        history_servers: {}
+        mysql: {}
+        hive_servers: {}
+        spark_clients: {}
+        spark_history_servers: {}
+        kafka_brokers: {}
+    # ---- zeppelin ----------------------------------------------------------
+    zeppelin:                  # هر Broker هم Controller است؛ حداقل ۳ عدد
+      hosts: {  node3: {} }

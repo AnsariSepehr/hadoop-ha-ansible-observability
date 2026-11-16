@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- {{ ansible_managed }} -->
+<configuration>
+  <property><name>fs.defaultFS</name><value>hdfs://{{ hdfs_nameservice }}</value></property>
+  <property><name>hadoop.tmp.dir</name><value>{{ data_root }}/hadoop/tmp</value></property>
+  <property><name>io.file.buffer.size</name><value>131072</value></property>
+  <property><name>ha.zookeeper.quorum</name><value>{{ zookeeper_connect }}</value></property>
+  <property><name>ha.zookeeper.session-timeout.ms</name><value>{{ hdfs_zk_session_timeout_ms }}</value></property>
+  <property><name>hadoop.proxyuser.{{ hadoop_user }}.hosts</name><value>*</value></property>
+  <property><name>hadoop.proxyuser.{{ hadoop_user }}.groups</name><value>*</value></property>
+{% if hadoop_ssl_enabled | bool %}
+  <property><name>hadoop.ssl.require.client.cert</name><value>false</value></property>
+  <property><name>hadoop.ssl.hostname.verifier</name><value>DEFAULT</value></property>
+  <property><name>hadoop.ssl.keystores.factory.class</name><value>org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory</value></property>
+  <property><name>hadoop.ssl.server.conf</name><value>ssl-server.xml</value></property>
+  <property><name>hadoop.ssl.client.conf</name><value>ssl-client.xml</value></property>
+{% endif %}
+</configuration>

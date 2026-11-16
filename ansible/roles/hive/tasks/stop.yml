@@ -1,0 +1,7 @@
+---
+- name: Stop Hive services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop: [hive-server2, hive-metastore]
+  failed_when: false

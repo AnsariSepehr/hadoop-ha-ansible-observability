@@ -1,0 +1,120 @@
+---
+- ansible.builtin.import_playbook: ../_lib/generate-ids.yml
+
+- name: Preflight - inventory, secrets and offline packages (control node)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    wanted_packages:
+      - { when: "{{ groups.get('namenodes', []) | length > 0 }}", label: Hadoop, path: "{{ hadoop_package }}" }
+      - { when: "{{ groups.get('zookeepers', []) | length > 0 }}", label: ZooKeeper, path: "{{ zookeeper_package }}" }
+      - { when: "{{ groups.get('hive_servers', []) | length > 0 }}", label: Hive, path: "{{ hive_package }}" }
+      - { when: "{{ groups.get('hive_servers', []) | length > 0 }}", label: MySQL-JDBC, path: "{{ mysql_connector_package }}" }
+      - { when: "{{ groups.get('spark_clients', []) | length > 0 }}", label: Spark, path: "{{ spark_package }}" }
+      - { when: "{{ groups.get('kafka_brokers', []) | length > 0 }}", label: Kafka, path: "{{ kafka_package }}" }
+      - { when: "{{ jmx_exporter_enabled | bool }}", label: JMX-exporter, path: "{{ jmx_exporter_package }}" }
+      - { when: true, label: "Java {{ hadoop_java_version }}", path: "{{ java_catalog[hadoop_java_version | string].package if java_catalog[hadoop_java_version | string].package is defined else java_catalog[hadoop_java_version | string].rpm_dir ~ '/' }}" }
+      - { when: "{{ groups.get('zookeepers', []) | length > 0 }}", label: "Java {{ zookeeper_java_version }} (ZooKeeper)", path: "{{ java_catalog[zookeeper_java_version | string].package if java_catalog[zookeeper_java_version | string].package is defined else java_catalog[zookeeper_java_version | string].rpm_dir ~ '/' }}" }
+      - { when: "{{ groups.get('hive_servers', []) | length > 0 }}", label: "Java {{ hive_java_version }} (Hive)", path: "{{ java_catalog[hive_java_version | string].package if java_catalog[hive_java_version | string].package is defined else java_catalog[hive_java_version | string].rpm_dir ~ '/' }}" }
+      - { when: "{{ groups.get('spark_clients', []) | length > 0 }}", label: "Java {{ spark_java_version }} (Spark)", path: "{{ java_catalog[spark_java_version | string].package if java_catalog[spark_java_version | string].package is defined else java_catalog[spark_java_version | string].rpm_dir ~ '/' }}" }
+      - { when: "{{ groups.get('kafka_brokers', []) | length > 0 }}", label: "Java {{ kafka_java_version }} (Kafka)", path: "{{ java_catalog[kafka_java_version | string].package if java_catalog[kafka_java_version | string].package is defined else java_catalog[kafka_java_version | string].rpm_dir ~ '/' }}" }
+  tasks:
+    - name: Require a supported Ansible controller version
+      ansible.builtin.assert:
+        that: ansible_version.full is version('2.14', '>=')
+        fail_msg: "ansible-core 2.14 or newer is required; found {{ ansible_version.full }}."
+
+    - name: Topology sanity
+      ansible.builtin.assert:
+        that:
+          - groups.get('namenodes', []) | length == 2
+          - groups.get('journalnodes', []) | length >= 3 and groups['journalnodes'] | length is odd
+          - groups.get('zookeepers', []) | length >= 3 and groups['zookeepers'] | length is odd
+          - groups.get('datanodes', []) | length >= 1
+          - groups.get('resourcemanagers', []) | length in [1, 2]
+          - groups.get('mysql', []) | length in [0, 1, 3, 5, 7, 9]
+          - groups.get('kafka_brokers', []) | length != 2
+        fail_msg: >-
+          Invalid topology: HDFS HA needs exactly 2 NameNodes; JournalNodes and ZooKeepers need an odd
+          number (>=3); MySQL Group Replication needs 1/3/5/7/9 nodes; Kafka needs 1 or >=3 brokers.
+        success_msg: Topology looks valid.
+
+    - name: Hive needs MySQL (or an external endpoint)
+      ansible.builtin.assert:
+        that: groups.get('mysql', []) | length > 0 or hive_mysql_host_override | default('') | length > 0
+        fail_msg: "hive_servers is not empty but there is no mysql group and hive_mysql_host_override is empty."
+      when: groups.get('hive_servers', []) | length > 0
+
+    - name: Secrets must be changed before the real installation
+      ansible.builtin.assert:
+        that:
+          - "'CHANGE_ME' not in mysql_root_password"
+          - "'CHANGE_ME' not in mysql_repl_password"
+          - "'CHANGE_ME' not in mysql_hive_password"
+        fail_msg: >-
+          Edit inventory/group_vars/all/secrets.yml (and encrypt it with ansible-vault),
+          or pass -e allow_default_secrets=true for a throw-away test cluster.
+      when: not (allow_default_secrets | default(false) | bool)
+
+    - name: Offline packages present?
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      loop: "{{ wanted_packages }}"
+      loop_control:
+        label: "{{ item.label }}"
+      when: item.when | bool
+      register: pkg_stat
+
+    - name: Kafka Java RPM set present?
+      ansible.builtin.set_fact:
+        kafka_java_rpms_found: "{{ lookup('ansible.builtin.fileglob', java_catalog[kafka_java_version | string].rpm_dir ~ '/*.rpm', wantlist=True) | length }}"
+      when:
+        - groups.get('kafka_brokers', []) | length > 0
+        - java_catalog[kafka_java_version | string].type == 'rpm'
+
+    - name: MySQL RPM set present?
+      ansible.builtin.set_fact:
+        mysql_rpms_found: "{{ lookup('ansible.builtin.fileglob', mysql_rpm_dir ~ '/*.rpm', wantlist=True) | length }}"
+      when: groups.get('mysql', []) | length > 0
+
+    - name: Report missing packages
+      ansible.builtin.fail:
+        msg: |
+          Missing offline packages (see offline_packages/README.md):
+          {% for r in pkg_stat.results if r.stat is defined and not r.stat.exists %}
+            - {{ r.item.label }}: {{ r.item.path }}
+          {% endfor %}
+          {% if groups.get('mysql', []) | length > 0 and mysql_rpms_found | int == 0 %}
+            - MySQL RPMs: {{ mysql_rpm_dir }}/*.rpm
+          {% endif %}
+          {% if groups.get('kafka_brokers', []) | length > 0 and java_catalog[kafka_java_version | string].type == 'rpm' and kafka_java_rpms_found | default(0) | int == 0 %}
+            - Kafka Java {{ kafka_java_version }} RPMs: {{ java_catalog[kafka_java_version | string].rpm_dir }}/*.rpm
+          {% endif %}
+      when: >-
+        (pkg_stat.results | selectattr('stat', 'defined') | rejectattr('stat.exists') | list | length > 0)
+        or (groups.get('mysql', []) | length > 0 and mysql_rpms_found | int == 0)
+        or (groups.get('kafka_brokers', []) | length > 0 and java_catalog[kafka_java_version | string].type == 'rpm' and kafka_java_rpms_found | default(0) | int == 0)
+
+- name: Preflight - cluster nodes
+  hosts: cluster
+  gather_facts: true
+  tasks:
+    - name: Supported operating system family
+      ansible.builtin.assert:
+        that: ansible_os_family == 'RedHat'
+        fail_msg: "{{ inventory_hostname }}: only RHEL-family systems (RHEL/Rocky/Alma 8-9) are supported."
+
+    - name: Required tools are installed (tar, gzip, sudo, runuser)
+      ansible.builtin.command: which tar gzip sudo runuser
+      changed_when: false
+
+    - name: Enough memory for the roles of this node
+      ansible.builtin.debug:
+        msg: "WARNING: {{ inventory_hostname }} has only {{ ansible_memtotal_mb }} MB RAM."
+      when: ansible_memtotal_mb | int < 3072
+
+    - name: Report resolved addresses
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ node_addr }} (groups: {{ group_names | join(', ') }})"

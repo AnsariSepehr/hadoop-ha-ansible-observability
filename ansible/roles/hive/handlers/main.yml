@@ -1,0 +1,11 @@
+---
+- name: Reload systemd (hive)
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart hive services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: [hive-metastore, hive-server2]
+  failed_when: false

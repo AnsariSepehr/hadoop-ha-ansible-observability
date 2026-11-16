@@ -1,0 +1,6 @@
+---
+- name: Stop ZooKeeper
+  hosts: zookeepers
+  tasks:
+    - ansible.builtin.systemd: { name: zookeeper, state: stopped }
+      failed_when: false

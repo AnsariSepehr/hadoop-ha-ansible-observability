@@ -1,0 +1,5 @@
+---
+- name: Start Hive Metastore and HiveServer2
+  hosts: hive_servers
+  tasks:
+    - ansible.builtin.include_role: { name: hive, tasks_from: start }

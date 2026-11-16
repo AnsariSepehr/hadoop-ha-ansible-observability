@@ -1,0 +1,106 @@
+---
+# Generic, idempotent installer. Input variables:
+#   pkg_label  - human name (hadoop)         pkg_src   - tarball on the control node
+#   pkg_dir    - versioned directory         pkg_link  - stable symlink
+#   pkg_owner / pkg_group
+- name: "{{ pkg_label }} - already installed?"
+  ansible.builtin.stat:
+    path: "{{ pkg_dir }}/.kadoop-installed"
+  register: pkg_marker
+
+- name: "{{ pkg_label }} - package present on control node?"
+  ansible.builtin.stat:
+    path: "{{ pkg_src }}"
+  delegate_to: localhost
+  become: false
+  register: pkg_local
+  when: not pkg_marker.stat.exists
+
+- name: "{{ pkg_label }} - fail if the package is missing"
+  ansible.builtin.fail:
+    msg: "Package not found: {{ pkg_src }}  (see offline_packages/README.md)"
+  when: not pkg_marker.stat.exists and not pkg_local.stat.exists
+
+- name: "{{ pkg_label }} - create versioned directory"
+  ansible.builtin.file:
+    path: "{{ pkg_dir }}"
+    state: directory
+    owner: "{{ pkg_owner }}"
+    group: "{{ pkg_group }}"
+    mode: "0755"
+
+- name: "{{ pkg_label }} - extract (top-level directory stripped)"
+  ansible.builtin.unarchive:
+    src: "{{ pkg_src }}"
+    dest: "{{ pkg_dir }}"
+    extra_opts: ["--strip-components=1"]
+    owner: "{{ pkg_owner }}"
+    group: "{{ pkg_group }}"
+  when: not pkg_marker.stat.exists
+
+- name: "{{ pkg_label }} - write install marker"
+  ansible.builtin.file:
+    path: "{{ pkg_dir }}/.kadoop-installed"
+    state: touch
+    owner: "{{ pkg_owner }}"
+    group: "{{ pkg_group }}"
+    mode: "0644"
+  when: not pkg_marker.stat.exists
+
+- name: "{{ pkg_label }} - is the stable link path a real directory?"
+  ansible.builtin.stat:
+    path: "{{ pkg_link }}"
+  register: pkg_link_stat
+
+- name: "{{ pkg_label }} - refuse to replace a non-symlink file at the stable link path"
+  ansible.builtin.assert:
+    that: pkg_link_stat.stat.isdir | default(false)
+    fail_msg: >-
+      {{ pkg_link }} exists as a regular file, not the expected software symlink or directory.
+      The installer will not replace it automatically; inspect and move it aside first.
+  when:
+    - pkg_link_stat.stat.exists
+    - not pkg_link_stat.stat.islnk | default(false)
+    - not pkg_link_stat.stat.isdir | default(false)
+
+- name: "{{ pkg_label }} - inspect a real directory occupying the stable link path"
+  ansible.builtin.find:
+    paths: "{{ pkg_link }}"
+    file_type: any
+    hidden: true
+    recurse: false
+  register: pkg_link_contents
+  when:
+    - pkg_link_stat.stat.exists
+    - pkg_link_stat.stat.isdir | default(false)
+    - not pkg_link_stat.stat.islnk | default(false)
+
+- name: "{{ pkg_label }} - refuse to delete a non-empty real directory at the stable link path"
+  ansible.builtin.assert:
+    that: (pkg_link_contents.matched | default(0) | int) == 0
+    fail_msg: >-
+      {{ pkg_link }} is a real, non-empty directory rather than the expected symlink.
+      It may contain an existing installation or user data. Move it aside manually after
+      reviewing its contents; this installer will not recursively delete it.
+  when:
+    - pkg_link_stat.stat.exists
+    - pkg_link_stat.stat.isdir | default(false)
+    - not pkg_link_stat.stat.islnk | default(false)
+
+- name: "{{ pkg_label }} - remove an empty real directory occupying the link path"
+  ansible.builtin.file:
+    path: "{{ pkg_link }}"
+    state: absent
+  when:
+    - pkg_link_stat.stat.exists
+    - pkg_link_stat.stat.isdir | default(false)
+    - not pkg_link_stat.stat.islnk | default(false)
+
+- name: "{{ pkg_label }} - point stable link at this version"
+  ansible.builtin.file:
+    src: "{{ pkg_dir }}"
+    dest: "{{ pkg_link }}"
+    state: link
+    force: true
+    owner: "{{ pkg_owner }}"
+    group: "{{ pkg_group }}"

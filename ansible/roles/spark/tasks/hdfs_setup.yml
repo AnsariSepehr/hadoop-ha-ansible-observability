@@ -1,0 +1,33 @@
+---
+# Runs once, from one Spark client: event-log dir and the pre-uploaded jars archive.
+- name: Event-log directory
+  ansible.builtin.shell: |
+    {{ hadoop_home }}/bin/hdfs dfs -mkdir -p {{ spark_event_log_dir | regex_replace('^hdfs://', '') }}
+    {{ hadoop_home }}/bin/hdfs dfs -chmod 1777 {{ spark_event_log_dir | regex_replace('^hdfs://', '') }}
+  environment: "{{ spark_env }}"
+  become: true
+  become_user: "{{ spark_user }}"
+  changed_when: true
+
+- name: Is the jars archive already in HDFS?
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -test -e {{ spark_yarn_archive_hdfs_dir }}/spark-libs.jar"
+  environment: "{{ spark_env }}"
+  become: true
+  become_user: "{{ spark_user }}"
+  register: spark_archive
+  failed_when: false
+  changed_when: false
+
+- name: Build and upload the jars archive
+  ansible.builtin.shell: |
+    set -e
+    cd {{ spark_home }}/jars && jar cfM /tmp/spark-libs.jar .
+    {{ hadoop_home }}/bin/hdfs dfs -mkdir -p {{ spark_yarn_archive_hdfs_dir }}
+    {{ hadoop_home }}/bin/hdfs dfs -put -f /tmp/spark-libs.jar {{ spark_yarn_archive_hdfs_dir }}/spark-libs.jar
+    {{ hadoop_home }}/bin/hdfs dfs -setrep {{ spark_yarn_replication }} {{ spark_yarn_archive_hdfs_dir }}/spark-libs.jar
+    rm -f /tmp/spark-libs.jar
+  environment: "{{ spark_env | combine({'PATH': spark_java_home ~ '/bin:' ~ '/usr/bin:/bin'}) }}"
+  become: true
+  become_user: "{{ spark_user }}"
+  when: spark_archive.rc != 0
+  changed_when: true

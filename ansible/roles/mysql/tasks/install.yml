@@ -1,0 +1,57 @@
+---
+- name: Which MySQL server version is installed?
+  ansible.builtin.command: rpm -q --qf '%{VERSION}' mysql-community-server
+  register: mysql_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install the RPM set
+  when: mysql_installed.rc != 0 or mysql_installed.stdout != mysql_version
+  block:
+    - name: Collect RPM files on the control node
+      ansible.builtin.set_fact:
+        mysql_rpm_files: "{{ lookup('ansible.builtin.fileglob', mysql_rpm_dir ~ '/*.rpm', wantlist=True) }}"
+
+    - name: The server RPM must be part of the set
+      ansible.builtin.assert:
+        that:
+          - mysql_rpm_files | select('search', 'mysql-community-server-' ~ mysql_version) | list | length == 1
+        fail_msg: "mysql-community-server-{{ mysql_version }}*.rpm not found in {{ mysql_rpm_dir }}"
+
+    - name: Create the RPM staging directory
+      ansible.builtin.file:
+        path: /tmp/kadoop-mysql
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Stage RPMs
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/tmp/kadoop-mysql/{{ item | basename }}"
+        mode: "0644"
+      loop: "{{ mysql_rpm_files }}"
+
+    - name: Install all RPMs in one transaction (no repositories are contacted)
+      ansible.builtin.dnf:
+        name: "{{ mysql_rpm_files | map('basename') | map('regex_replace', '^', '/tmp/kadoop-mysql/') | list }}"
+        state: present
+        disablerepo: "*"
+        disable_gpg_check: true
+        allowerasing: true
+        install_weak_deps: false
+
+    - name: Remove staged RPMs
+      ansible.builtin.file:
+        path: /tmp/kadoop-mysql
+        state: absent
+
+- name: Locate mysqld
+  ansible.builtin.shell: for p in /usr/sbin/mysqld /usr/libexec/mysqld; do [ -x $p ] && echo $p && exit 0; done; exit 1
+  register: mysqld_locate
+  changed_when: false
+
+- name: Remember the binary path
+  ansible.builtin.set_fact:
+    mysqld_binary: "{{ mysqld_locate.stdout }}"

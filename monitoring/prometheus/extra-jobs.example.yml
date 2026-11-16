@@ -1,0 +1,51 @@
+# Optional scrape jobs for services that are NOT installed by the Ansible project.
+# Copy the blocks you use into the scrape_configs list of prometheus.yml.
+# Replace every <PLACEHOLDER>. Do not commit real addresses or tokens.
+
+  - job_name: 'kafka_exporter'
+    static_configs:
+      - targets: ['<KAFKA_EXPORTER_IP>:9308']
+        labels: { service: 'kafka' }
+
+  - job_name: 'cadvisor_docker'          # Docker Swarm hosts (cAdvisor published on 9338)
+    scrape_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_swarm_service_name]
+        regex: '(.+)'
+        target_label: service
+      - source_labels: [name]
+        regex: '(.+)'
+        target_label: container
+    static_configs:
+      - { targets: ['<SWARM_NODE1_IP>:9338'], labels: { hostname: 'swarm1' } }
+      - { targets: ['<SWARM_NODE2_IP>:9338'], labels: { hostname: 'swarm2' } }
+
+  - job_name: 'airflow_statsd'
+    static_configs:
+      - targets: ['<AIRFLOW_IP>:9102']
+        labels: { service: 'airflow' }
+
+  - job_name: 'ranger_admin_jmx'
+    static_configs:
+      - targets: ['<RANGER_IP>:7073']
+        labels: { role: 'ranger-admin' }
+  - job_name: 'ranger_usersync_jmx'
+    static_configs:
+      - targets: ['<RANGER_IP>:7074']
+        labels: { role: 'ranger-usersync' }
+
+  - job_name: 'trino_jmx'
+    static_configs:
+      - { targets: ['<TRINO_COORDINATOR_IP>:9404'], labels: { role: 'coordinator' } }
+      - { targets: ['<TRINO_WORKER_IP>:9404'],      labels: { role: 'worker' } }
+
+  # Kubernetes API server and kubelets, scraped with a service-account token.
+  # The token file is mounted read-only at /etc/prometheus/k8s/token. Never commit it.
+  - job_name: 'kubelet'
+    scheme: https
+    scrape_interval: 30s
+    bearer_token_file: /etc/prometheus/k8s/token
+    tls_config:
+      ca_file: /etc/prometheus/k8s/ca.crt   # prefer a CA over insecure_skip_verify
+    static_configs:
+      - { targets: ['<K8S_NODE_IP>:10250'], labels: { node: 'k8s1' } }

@@ -1,0 +1,29 @@
+---
+hdfs_cluster_id: "{{ cluster_name }}"
+hdfs_replication: "{{ [3, groups.get('datanodes', []) | length] | min }}"
+hdfs_zk_session_timeout_ms: 10000
+hdfs_fencing_methods: ["sshfence({{ hadoop_user }})", "shell(/bin/true)"]
+hdfs_force_reformat: false
+
+# Persistent ownership for the ResourceManager node-attribute filesystem store.
+yarn_node_attribute_store_dir: /tmp/hadoop-yarn-hadoop
+hadoop_run: "runuser -u {{ hadoop_user }} --"
+
+hdfs_base_dirs:
+  - { path: /tmp, mode: "1777", owner: "{{ hadoop_user }}" }
+  - { path: /tmp/logs, mode: "1777", owner: "{{ hadoop_user }}" }
+  - { path: /user, mode: "0755", owner: "{{ hadoop_user }}" }
+  - { path: "/user/{{ hadoop_user }}", mode: "0755", owner: "{{ hadoop_user }}" }
+  - { path: /user/history, mode: "1777", owner: "{{ hadoop_user }}" }
+
+hadoop_units:
+  - { name: journalnode,      group: journalnodes,     bin: hdfs,   opts: HDFS_JOURNALNODE_OPTS,     desc: HDFS JournalNode }
+  - { name: namenode,         group: namenodes,        bin: hdfs,   opts: HDFS_NAMENODE_OPTS,        desc: HDFS NameNode,        after: hadoop-journalnode.service }
+  - { name: zkfc,             group: namenodes,        bin: hdfs,   opts: HDFS_ZKFC_OPTS,            desc: HDFS ZKFC,            after: hadoop-namenode.service }
+  - { name: datanode,         group: datanodes,        bin: hdfs,   opts: HDFS_DATANODE_OPTS,        desc: HDFS DataNode }
+  - { name: resourcemanager,  group: resourcemanagers, bin: yarn,   opts: YARN_RESOURCEMANAGER_OPTS, desc: YARN ResourceManager }
+  - { name: nodemanager,      group: nodemanagers,     bin: yarn,   opts: YARN_NODEMANAGER_OPTS,     desc: YARN NodeManager }
+  - { name: historyserver,    group: history_servers,  bin: mapred, opts: MAPRED_HISTORYSERVER_OPTS, desc: MapReduce JobHistory }
+
+hadoop_ssl_dir: "{{ hadoop_conf_dir }}/ssl"
+hadoop_ssl_custom_dir: "{{ generated_dir }}/ssl-custom"
